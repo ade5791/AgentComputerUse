@@ -65,6 +65,14 @@ if 'show_dashboard' in query_params and query_params['show_dashboard'] == 'true'
     # Stop further execution of the main app since we're showing the dashboard
     st.stop()
 
+# Check if we should show the API documentation
+if 'show_api_docs' in query_params and query_params['show_api_docs'] == 'true':
+    # Import API documentation functionality
+    import api_docs
+    api_docs.load_api_docs()
+    # Stop further execution of the main app since we're showing the API docs
+    st.stop()
+
 # Check for session ID in URL query parameters    
 if 'session' in query_params:
     session_id = query_params['session']
@@ -532,26 +540,29 @@ with st.sidebar:
     
     close_button = st.button("Close Browser", on_click=close_browser)
     
-    # Dashboard link
-    st.header("Analytics")
+    # Dashboard and API docs links
+    st.header("Analytics & Documentation")
     
     def open_dashboard():
         """Function to navigate to the dashboard"""
         # Store current state in session
         st.session_state.view_dashboard = True
-        # Redirect to dashboard.py
-        import sys
-        import os
-        
-        script_path = os.path.join(os.getcwd(), "dashboard.py")
-        os.environ["STREAMLIT_RUN_TARGET"] = script_path
-        # This will be handled on next rerun
+        # Set query params to show dashboard
+        st.query_params["show_dashboard"] = "true"
     
-    if st.button("📊 View Session Dashboard", use_container_width=True, type="primary"):
-        # Create a redirect URL
-        st.markdown("""
-        <meta http-equiv="refresh" content="0;URL='/?show_dashboard=true'" />
-        """, unsafe_allow_html=True)
+    def open_api_docs():
+        """Function to navigate to the API documentation"""
+        # Store current state in session
+        st.session_state.view_api_docs = True
+        # Set query params to show API docs
+        st.query_params["show_api_docs"] = "true"
+    
+    col1, col2 = st.columns(2)
+    if col1.button("📊 View Session Dashboard", use_container_width=True, type="primary"):
+        open_dashboard()
+        
+    if col2.button("🔌 API Documentation", use_container_width=True):
+        open_api_docs()
     
     # Session history info
     session_count = len(st.session_state.session_manager.list_sessions())
