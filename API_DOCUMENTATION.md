@@ -90,7 +90,27 @@ Retrieves the current status of a session, including logs and screenshots.
       "status": "running",
       "logs": ["Starting browser", "Navigating to Google", "Typing search query"],
       "current_screenshot": "base64-encoded-image",
-      "pending_safety_checks": null
+      "pending_safety_checks": null,
+      "reasoning": [
+        {
+          "id": "reason_1",
+          "content": [
+            {
+              "type": "text",
+              "text": "I'll start by navigating to Google's homepage and search for 'best pizza in New York'"
+            }
+          ]
+        },
+        {
+          "id": "reason_2",
+          "content": [
+            {
+              "type": "text",
+              "text": "I notice there are several review sites in the results. I'll click on the Yelp link to see their rankings."
+            }
+          ]
+        }
+      ]
     }
   }
   ```
@@ -221,6 +241,28 @@ Retrieves detailed information about a specific session.
             "timestamp": "2025-03-11T10:15:35Z"
           },
           ...
+        ],
+        "reasoning_data": [
+          {
+            "id": "reason_1",
+            "timestamp": "2025-03-11T10:15:32Z",
+            "content": [
+              {
+                "type": "text",
+                "text": "I'll search for pizza restaurants in New York to find the highest-rated options."
+              }
+            ]
+          },
+          {
+            "id": "reason_2",
+            "timestamp": "2025-03-11T10:16:05Z",
+            "content": [
+              {
+                "type": "text",
+                "text": "I'll now click on the Yelp link to see their curated list of top pizza places."
+              }
+            ]
+          }
         ]
       },
       "is_active": false,
@@ -458,3 +500,18 @@ Common HTTP status codes:
 ## Rate Limiting
 
 The API implements rate limiting to prevent abuse. If you exceed the rate limit, you will receive a `429 Too Many Requests` response.
+
+## Automatic Session Timeout
+
+For resource optimization and security, sessions automatically end after 5 minutes of inactivity. This feature:
+
+- Prevents abandoned sessions from consuming resources
+- Increases security by limiting the exposure window of active sessions
+- Improves overall system performance
+
+When a session times out:
+- Its status is set to "timeout"
+- Browser resources are automatically cleaned up
+- A log entry is added to document the timeout event
+
+You can restart a timed-out session by creating a new session with the same task.

@@ -33,6 +33,15 @@ class SessionManager:
         self.session_cache: Dict[str, Dict[str, Any]] = {}
         self.cache_lock = threading.Lock()
         
+        # Session inactivity timeout (5 minutes = 300 seconds)
+        self.inactivity_timeout = 300
+        
+        # Start the timeout monitor thread
+        self.timeout_monitor_running = True
+        self.timeout_monitor = threading.Thread(target=self._monitor_session_timeouts)
+        self.timeout_monitor.daemon = True
+        self.timeout_monitor.start()
+        
     def create_session(self, task, environment, browser_config, user_id=None, name=None, tags=None, priority="normal"):
         """
         Create a new session for browser automation.
@@ -404,6 +413,7 @@ class SessionManager:
     def unregister_thread(self, session_id):
         """
         Unregister a thread for a finished session.
+        Also cleans up any browser resources associated with the session.
         
         Args:
             session_id (str): The session ID.
@@ -411,9 +421,34 @@ class SessionManager:
         Returns:
             bool: True if unregistration was successful.
         """
-        if session_id in self.active_threads:
-            del self.active_threads[session_id]
-            return True
+        try:
+            # Try to get active thread info for this session
+            if session_id in self.active_threads:
+                # Log the unregistration
+                self.add_log(session_id, "Unregistering session thread and cleaning up resources")
+                
+                # Reference to thread info before removing it
+                thread_info = self.active_threads[session_id]
+                
+                # Remove from active threads
+                del self.active_threads[session_id]
+                
+                # Check if session data has browser reference to clean up
+                session_data = self.get_session(session_id)
+                if session_data and "browser" in session_data:
+                    try:
+                        # Try to close the browser if it's still open
+                        browser = session_data["browser"]
+                        if browser and hasattr(browser, "close"):
+                            browser.close()
+                    except Exception as e:
+                        # Log but continue with cleanup
+                        print(f"Error closing browser for session {session_id}: {str(e)}")
+                
+                return True
+        except Exception as e:
+            print(f"Error unregistering thread for session {session_id}: {str(e)}")
+        
         return False
     
     def is_session_active(self, session_id):
@@ -641,6 +676,64 @@ class SessionManager:
                 continue
                 
         return cleaned_count
+    
+    def _monitor_session_timeouts(self):
+        """
+        Monitor active sessions for inactivity and automatically end them after timeout period.
+        Runs continuously in a separate thread.
+        """
+        while self.timeout_monitor_running:
+            try:
+                # Get all active sessions
+                active_session_ids = list(self.active_threads.keys())
+                
+                for session_id in active_session_ids:
+                    try:
+                        # Skip sessions that are already stopped or completed
+                        session_data = self.get_session(session_id)
+                        if not session_data or session_data.get("status") in ["completed", "stopped", "error", "timeout"]:
+                            continue
+                            
+                        # Check if session is paused - paused sessions don't timeout
+                        if session_data.get("is_paused", False):
+                            continue
+                            
+                        # Calculate time since last activity
+                        last_update = session_data.get("updated_at")
+                        if not last_update:
+                            continue
+                            
+                        try:
+                            last_update_time = datetime.fromisoformat(last_update)
+                            elapsed_seconds = (datetime.now() - last_update_time).total_seconds()
+                            
+                            # Check if session exceeded timeout period
+                            if elapsed_seconds > self.inactivity_timeout:
+                                # Log the timeout
+                                self.add_log(session_id, f"Session automatically terminated due to {self.inactivity_timeout} seconds of inactivity")
+                                
+                                # End the session with timeout status
+                                self.update_session(session_id, {
+                                    "status": "timeout",
+                                    "is_completed": True,
+                                    "completion_time": datetime.now().isoformat()
+                                })
+                                
+                                # Clean up resources
+                                self.unregister_thread(session_id)
+                        except Exception as e:
+                            # Skip sessions with invalid timestamp format
+                            continue
+                    except Exception as e:
+                        # Skip problematic sessions
+                        continue
+                        
+            except Exception as e:
+                # Log but continue monitoring
+                print(f"Error in session timeout monitor: {str(e)}")
+                
+            # Check every 30 seconds to avoid excessive CPU usage
+            time.sleep(30)
     
     def _save_session(self, session_id, session_data):
         """
