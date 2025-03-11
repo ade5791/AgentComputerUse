@@ -84,7 +84,11 @@ class SafetyCheck(BaseModel):
     id: str
     code: str
     message: str
-
+    
+class ReasoningItem(BaseModel):
+    id: str
+    content: List[Dict[str, Any]] = []
+    
 class StatusResponse(BaseModel):
     session_id: str
     task_id: str
@@ -92,6 +96,7 @@ class StatusResponse(BaseModel):
     logs: List[str]
     current_screenshot: Optional[str] = None
     pending_safety_checks: Optional[List[SafetyCheck]] = None
+    reasoning: Optional[List[ReasoningItem]] = None
 
 class SessionControlRequest(BaseModel):
     session_id: str
@@ -255,6 +260,9 @@ def agent_loop(session_id, task_id):
         
         # Create initial request to Computer Use Agent
         response = agent.initial_request(task, screenshot)
+        
+        # Store the response for access to reasoning data
+        session_data["last_response"] = response
         
         add_log(session_id, f"Received initial response from agent (ID: {response.id})")
         
@@ -528,13 +536,30 @@ async def get_session_status(session_id: str, task_id: str):
                 message=sc.message
             ))
     
+    # Extract reasoning items from the latest agent response if available
+    reasoning_items = None
+    if hasattr(session_data.get("last_response", {}), 'output'):
+        # Find all reasoning items in the response output
+        reasoning = [
+            ReasoningItem(
+                id=item.id,
+                content=item.content if hasattr(item, 'content') else []
+            )
+            for item in session_data["last_response"].output 
+            if hasattr(item, 'type') and item.type == "reasoning"
+        ]
+        
+        if reasoning:
+            reasoning_items = reasoning
+    
     return StatusResponse(
         session_id=session_id,
         task_id=task_id,
         status=session_data["status"],
         logs=logs,
         current_screenshot=current_screenshot,
-        pending_safety_checks=pending_safety_checks
+        pending_safety_checks=pending_safety_checks,
+        reasoning=reasoning_items
     )
 
 @app.post("/api/sessions/{session_id}/stop", response_model=ApiResponse)
