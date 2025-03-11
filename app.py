@@ -488,61 +488,189 @@ def agent_loop_with_response(initial_response):
     finally:
         st.session_state.agent_running = False
 
-# Main UI
-st.title("🤖 Computer Use Agent")
+# Add CSS to match the OpenAI Computer Use interface style
 st.markdown("""
-This application allows you to automate browser tasks using OpenAI's Computer Use Agent API.
-The agent will take screenshots of the browser, decide what actions to take, and execute them automatically.
-""")
+<style>
+    /* Main container styling */
+    .main {
+        background-color: white;
+        padding: 0 !important;
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background-color: #f7f7f8;
+        border-right: 1px solid #e5e5e5;
+    }
+    
+    /* Header styling */
+    .stApp header {
+        background-color: white;
+        border-bottom: 1px solid #e5e5e5;
+    }
+    
+    /* Input field styling */
+    .stTextArea textarea {
+        border-radius: 8px;
+        border: 1px solid #e5e5e5;
+        background-color: #ffffff;
+        padding: 10px;
+        font-size: 16px;
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 14px;
+        border: 1px solid #e5e5e5;
+        background-color: #f7f7f8;
+    }
+    
+    /* Primary button styling */
+    .stButton > button[data-baseweb="button"]:first-child {
+        background-color: #10a37f;
+        color: white;
+        border: none;
+    }
+    
+    /* Recent prompts styling */
+    .recent-item {
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        background-color: #f7f7f8;
+        cursor: pointer;
+        font-size: 14px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .recent-item:hover {
+        background-color: #e5e5e5;
+    }
+    
+    /* Task response area */
+    .task-response {
+        border-radius: 8px;
+        border: 1px solid #e5e5e5;
+        padding: 15px;
+        margin-top: 15px;
+        background-color: #f7f7f8;
+    }
+    
+    /* Center content block */
+    .center-col {
+        max-width: 800px;
+        margin: 0 auto;
+        padding-top: 60px;
+    }
+    
+    /* Main title */
+    .main-title {
+        font-size: 32px;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    
+    /* Subtitle */
+    .subtitle {
+        font-size: 16px;
+        text-align: center;
+        color: #6e6e80;
+        margin-bottom: 30px;
+    }
+    
+    /* Recent prompt label */
+    .recent-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #6e6e80;
+        margin-bottom: 10px;
+    }
+    
+    /* Browser view container */
+    .browser-container {
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-top: 20px;
+    }
+    
+    /* Bottom task bar */
+    .task-bar {
+        background-color: #f7f7f8;
+        border-top: 1px solid #e5e5e5;
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    /* Example buttons */
+    .example-button {
+        display: inline-block;
+        padding: 8px 12px;
+        margin-right: 10px;
+        background-color: #f7f7f8;
+        border: 1px solid #e5e5e5;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+    
+    .example-button:hover {
+        background-color: #e5e5e5;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Sidebar for configuration
+# Sidebar with recent tasks and history
 with st.sidebar:
-    st.header("Configuration")
+    # Logo or title
+    st.markdown("# Recents")
     
-    # OpenAI API Key
-    if not os.environ.get("OPENAI_API_KEY"):
-        api_key = st.text_input("OpenAI API Key", type="password")
-        if api_key:
-            st.session_state.openai_api_key = api_key
+    # Get recent sessions
+    recent_sessions = st.session_state.session_manager.list_sessions(limit=10)
     
-    st.session_state.environment = st.selectbox(
-        "Environment",
-        options=["browser", "mac", "windows", "ubuntu"],
-        index=0
-    )
+    # Show recent sessions as clickable items
+    for session in recent_sessions:
+        task_text = session.get('task', 'Unknown task')
+        if len(task_text) > 50:
+            task_text = task_text[:47] + "..."
+        
+        st.markdown(f"""
+        <div class="recent-item" onclick="window.location.href='?session={session['id']}'">
+            {task_text}
+        </div>
+        """, unsafe_allow_html=True)
     
-    st.session_state.display_width = st.number_input(
-        "Display Width",
-        min_value=800,
-        max_value=1920,
-        value=1024
-    )
+    if not recent_sessions:
+        st.markdown("No recent sessions")
     
-    st.session_state.display_height = st.number_input(
-        "Display Height",
-        min_value=600,
-        max_value=1080,
-        value=768
-    )
+    st.markdown(f"<div style='font-size: 12px; color: #6e6e80; margin-top: 10px;'>View all {len(st.session_state.session_manager.list_sessions())} sessions</div>", unsafe_allow_html=True)
     
-    st.session_state.headless = st.checkbox("Headless Browser", value=True)
+    # Add History, API, and Support links at bottom
+    st.markdown("<div style='position: absolute; bottom: 20px; left: 20px;'>", unsafe_allow_html=True)
     
-    st.session_state.starting_url = st.text_input(
-        "Starting URL",
-        value="https://www.google.com"
-    )
+    if st.button("📊 History", key="history_btn"):
+        open_dashboard()
     
-    # Actions
-    st.header("Actions")
-    col1, col2 = st.columns(2)
-    start_button = col1.button("Start Agent", on_click=start_agent)
-    stop_button = col2.button("Stop Agent", on_click=stop_agent)
+    if st.button("🔌 API", key="api_btn"):
+        open_api_docs()
     
-    close_button = st.button("Close Browser", on_click=close_browser)
+    if st.button("📞 Support", key="support_btn"):
+        st.session_state.show_support = True
     
-    # Dashboard and API docs links
-    st.header("Analytics & Documentation")
-    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Main content
+main_col1, main_col2, main_col3 = st.columns([1, 3, 1])
+
+with main_col2:
+    # Store functions for navigation
     def open_dashboard():
         """Function to navigate to the dashboard"""
         # Store current state in session
@@ -556,48 +684,149 @@ with st.sidebar:
         st.session_state.view_api_docs = True
         # Set query params to show API docs
         st.query_params["show_api_docs"] = "true"
-    
-    col1, col2 = st.columns(2)
-    if col1.button("📊 View Session Dashboard", use_container_width=True, type="primary"):
-        open_dashboard()
+
+    # Check if we are in a session or showing the main input screen
+    if st.session_state.current_session_id and st.session_state.screenshot:
+        # We're in a session - show the browser view and agent status
         
-    if col2.button("🔌 API Documentation", use_container_width=True):
-        open_api_docs()
-    
-    # Session history info
-    session_count = len(st.session_state.session_manager.list_sessions())
-    st.info(f"You have {session_count} stored sessions. View them in the dashboard.")
-
-# Task input
-st.header("Task Description")
-st.session_state.task = st.text_area(
-    "Describe the task you want the agent to perform",
-    height=100,
-    placeholder="Example: Search for the latest news about OpenAI on Google"
-)
-
-# Main content area - split into two columns
-col1, col2 = st.columns([3, 2])
-
-# Left column - Screenshot
-with col1:
-    st.header("Browser View")
-    screenshot_placeholder = st.empty()
-    
-    # Display the current screenshot if available
-    if st.session_state.screenshot:
+        # Get session data
+        session_data = st.session_state.session_manager.get_session(st.session_state.current_session_id)
+        task_text = session_data.get('task', 'Unknown task')
+        
+        # Show the task description
+        st.markdown(f"<div style='margin-bottom: 20px;'><strong>Task:</strong> {task_text}</div>", unsafe_allow_html=True)
+        
+        # Browser container
+        st.markdown("<div class='browser-container'>", unsafe_allow_html=True)
+        
+        # Display the current screenshot
         try:
             image_data = base64.b64decode(st.session_state.screenshot)
             image = Image.open(io.BytesIO(image_data))
-            screenshot_placeholder.image(image, use_column_width=True)
+            st.image(image, use_column_width=True)
         except Exception as e:
-            screenshot_placeholder.error(f"Failed to display screenshot: {str(e)}")
+            st.error(f"Failed to display screenshot: {str(e)}")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Action buttons below the browser view
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("⏹️ Stop Agent", use_container_width=True, on_click=stop_agent):
+                pass
+        with col2:
+            if st.button("🏠 New Task", use_container_width=True):
+                # Reset session state and refresh page
+                st.session_state.current_session_id = None
+                st.session_state.screenshot = None
+                st.session_state.browser = None
+                st.experimental_rerun()
+        
+        # Log container
+        with st.expander("Show Agent Logs", expanded=False):
+            log_text = "\n".join(st.session_state.logs)
+            st.text_area("Logs", value=log_text, height=300, disabled=True)
+        
+        # Safety check confirmation UI if needed
+        if st.session_state.awaiting_safety_confirmation:
+            st.warning("OpenAI's Computer Use Agent has detected a potential safety issue that requires your approval to continue.")
+            
+            # Display each safety check
+            for safety_check in st.session_state.pending_safety_checks:
+                st.markdown(f"**Safety Check Type:** {safety_check.code}")
+                st.markdown(f"**Message:** {safety_check.message}")
+                
+            st.markdown("""
+            Please review the safety concerns above and decide whether to allow the agent to proceed.
+            Confirming will allow the agent to continue with the requested action. Rejecting will stop the agent.
+            """)
+            
+            # Confirmation buttons
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Confirm & Continue", use_container_width=True, on_click=confirm_safety_checks):
+                    pass
+            with col2:
+                if st.button("❌ Reject & Stop", use_container_width=True, on_click=reject_safety_checks):
+                    pass
     else:
-        screenshot_placeholder.info("No screenshot available yet. Start the agent to see the browser.")
-
-# Right column - Logs
-with col2:
-    st.header("Agent Logs")
+        # Show the main input screen
+        st.markdown("<div class='center-col'>", unsafe_allow_html=True)
+        
+        st.markdown("<h1 class='main-title'>What do you want done?</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='subtitle'>Prompt, run, and let agent do the rest.</p>", unsafe_allow_html=True)
+        
+        # Task input field
+        st.session_state.task = st.text_area(
+            "Enter a task for the agent to perform",
+            height=120,
+            label_visibility="collapsed",
+            placeholder="Example: Search for the latest news about OpenAI on Google"
+        )
+        
+        # Add a "Send" button to start agent
+        if st.button("Send", key="send_button", type="primary", use_container_width=False):
+            start_agent()
+        
+        # Examples section
+        st.markdown("<div style='margin-top: 20px; text-align: center;'>", unsafe_allow_html=True)
+        
+        # Example tasks
+        example_tasks = [
+            "Extract SheetJS",
+            "Combine Wikipedia pages",
+            "Message to founders",
+            "DE Obama website"
+        ]
+        
+        for task in example_tasks:
+            if st.button(task, key=f"example_{task}", use_container_width=False):
+                st.session_state.task = task
+                start_agent()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Advanced configuration (hidden by default)
+        with st.expander("Advanced Configuration", expanded=False):
+            # Configuration fields
+            # OpenAI API Key
+            if not os.environ.get("OPENAI_API_KEY"):
+                api_key = st.text_input("OpenAI API Key", type="password")
+                if api_key:
+                    st.session_state.openai_api_key = api_key
+            
+            st.session_state.environment = st.selectbox(
+                "Environment",
+                options=["browser", "mac", "windows", "ubuntu"],
+                index=0
+            )
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.session_state.display_width = st.number_input(
+                    "Display Width",
+                    min_value=800,
+                    max_value=1920,
+                    value=1024
+                )
+            
+            with col2:
+                st.session_state.display_height = st.number_input(
+                    "Display Height",
+                    min_value=600,
+                    max_value=1080,
+                    value=768
+                )
+            
+            st.session_state.headless = st.checkbox("Headless Browser", value=True)
+            
+            st.session_state.starting_url = st.text_input(
+                "Starting URL",
+                value="https://www.google.com"
+            )
+        
+        st.markdown("</div>", unsafe_allow_html=True)
     logs_placeholder = st.empty()
     
     # Display logs in reverse order (newest first)
