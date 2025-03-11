@@ -82,7 +82,12 @@ class BrowserAutomation:
         Args:
             action: The action object from the Computer Use Agent API.
         """
-        action_type = action.get("type", "").lower()
+        # Check if this is a computer_call action from the Responses API
+        if hasattr(action, 'type') and action.type == "action":
+            action_type = action.type.lower()
+        else:
+            # Handle dictionary format for backward compatibility
+            action_type = action.get("type", "").lower()
         
         if action_type == "click":
             await self._click(action)
@@ -106,10 +111,21 @@ class BrowserAutomation:
         Args:
             action: The click action details.
         """
-        x = action.get("x", 0)
-        y = action.get("y", 0)
+        # Support both object-style and dict-style actions
+        if hasattr(action, 'x') and hasattr(action, 'y'):
+            x = action.x
+            y = action.y
+            button = getattr(action, 'button', 'left')
+        else:
+            x = action.get("x", 0)
+            y = action.get("y", 0)
+            button = action.get("button", "left")
         
-        await self.page.mouse.click(x, y)
+        # Map button type
+        button_map = {"left": "left", "middle": "middle", "right": "right"}
+        button_type = button_map.get(button, "left")
+        
+        await self.page.mouse.click(x, y, button=button_type)
     
     async def _double_click(self, action):
         """
@@ -118,8 +134,13 @@ class BrowserAutomation:
         Args:
             action: The double-click action details.
         """
-        x = action.get("x", 0)
-        y = action.get("y", 0)
+        # Support both object-style and dict-style actions
+        if hasattr(action, 'x') and hasattr(action, 'y'):
+            x = action.x
+            y = action.y
+        else:
+            x = action.get("x", 0)
+            y = action.get("y", 0)
         
         await self.page.mouse.dblclick(x, y)
     
@@ -130,8 +151,13 @@ class BrowserAutomation:
         Args:
             action: The scroll action details.
         """
-        dx = action.get("dx", 0)
-        dy = action.get("dy", 0)
+        # Support both object-style and dict-style actions
+        if hasattr(action, 'scroll_x') and hasattr(action, 'scroll_y'):
+            dx = action.scroll_x
+            dy = action.scroll_y
+        else:
+            dx = action.get("dx", 0)
+            dy = action.get("dy", 0)
         
         await self.page.mouse.wheel(dx, dy)
     
@@ -142,7 +168,11 @@ class BrowserAutomation:
         Args:
             action: The type action details.
         """
-        text = action.get("text", "")
+        # Support both object-style and dict-style actions
+        if hasattr(action, 'text'):
+            text = action.text
+        else:
+            text = action.get("text", "")
         
         await self.page.keyboard.type(text)
     
@@ -153,9 +183,14 @@ class BrowserAutomation:
         Args:
             action: The keypress action details.
         """
-        key = action.get("key", "")
-        
-        await self.page.keyboard.press(key)
+        # Support both object-style and dict-style actions
+        if hasattr(action, 'keys'):
+            keys = action.keys
+            for key in keys:
+                await self.page.keyboard.press(key)
+        else:
+            key = action.get("key", "")
+            await self.page.keyboard.press(key)
     
     async def _wait(self, action):
         """
@@ -164,7 +199,11 @@ class BrowserAutomation:
         Args:
             action: The wait action details.
         """
-        ms = action.get("ms", 1000)
+        # Support both object-style and dict-style actions
+        if hasattr(action, 'ms'):
+            ms = action.ms
+        else:
+            ms = action.get("ms", 1000)
         
         await asyncio.sleep(ms / 1000)
     
