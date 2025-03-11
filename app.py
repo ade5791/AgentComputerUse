@@ -79,6 +79,14 @@ if 'show_api_docs' in query_params and query_params['show_api_docs'] == 'true':
     api_docs.load_api_docs()
     # Stop further execution of the main app since we're showing the API docs
     st.stop()
+    
+# Check if we should show the session replay
+if 'replay_session' in query_params:
+    # Import session replay functionality
+    import session_replay
+    session_replay.load_session_replay(query_params['replay_session'], st.session_state.session_manager)
+    # Stop further execution of the main app since we're showing the session replay
+    st.stop()
 
 # Check for session ID in URL query parameters    
 if 'session' in query_params:
@@ -755,38 +763,81 @@ if st.session_state.awaiting_safety_confirmation and st.session_state.pending_sa
 # Display session information
 if st.session_state.current_session_id:
     st.header("Session Information")
-    session_link = st.session_state.session_manager.get_session_link(
-        st.session_state.current_session_id,
-        base_url="http://0.0.0.0:5000"
-    )
-    st.markdown(f"**Session ID:** {st.session_state.current_session_id}")
-    st.markdown(f"**Shareable Link:** [Open Session]({session_link})")
-    st.text_input(
-        "Copy Session Link",
-        value=session_link,
-        key="session_link_input",
-        disabled=True
-    )
+    
+    # Display session details
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        session_link = st.session_state.session_manager.get_session_link(
+            st.session_state.current_session_id,
+            base_url="http://0.0.0.0:5000"
+        )
+        st.markdown(f"**Session ID:** {st.session_state.current_session_id}")
+        st.markdown(f"**Shareable Link:** [Open Session]({session_link})")
+        st.text_input(
+            "Copy Session Link",
+            value=session_link,
+            key="session_link_input",
+            disabled=True
+        )
+    
+    with col2:
+        # Import session replay
+        import session_replay
+        
+        # Add the replay button
+        st.markdown("#### Session Actions")
+        session_replay.add_replay_button_to_session(st.session_state.current_session_id, st)
+        
+        # Add quick metrics about the session
+        session_data = st.session_state.session_manager.get_session(st.session_state.current_session_id)
+        if session_data:
+            screenshots_count = len(session_data.get('screenshots', []))
+            actions_count = len(session_data.get('actions', []))
+            st.markdown(f"**Screenshots:** {screenshots_count}")
+            st.markdown(f"**Actions:** {actions_count}")
 
 # Display previous sessions
 st.header("Previous Sessions")
 sessions = st.session_state.session_manager.list_sessions(limit=5)
 if sessions:
+    # Import session replay if not already imported
+    if 'session_replay' not in locals():
+        import session_replay
+        
     for session in sessions:
-        col1, col2 = st.columns([3, 1])
+        col1, col2, col3 = st.columns([3, 1, 1])
         with col1:
             st.markdown(f"**{session['task'][:50] + '...' if len(session['task']) > 50 else session['task']}**")
             st.caption(f"Created: {session['created_at'][:16]} | Environment: {session['environment']} | Status: {session['status']}")
+            
+            # Display metrics about screenshots and actions
+            screenshots_count = len(session.get('screenshots', []))
+            actions_count = len(session.get('actions', []))
+            st.caption(f"📸 Screenshots: {screenshots_count} | 🔄 Actions: {actions_count}")
+            
         with col2:
             session_link = st.session_state.session_manager.get_session_link(
                 session['id'],
                 base_url="http://0.0.0.0:5000"
             )
+            
+            def open_session(session_id):
+                st.query_params.update({"session": session_id})
+                
             st.button(
                 "View Session",
                 key=f"view_session_{session['id']}",
-                on_click=lambda s=session_link: st.query_params.update({"session": s})
+                on_click=lambda s=session['id']: open_session(s)
             )
+            
+        with col3:
+            # Add replay button for each session
+            session_replay.add_replay_button_to_session(
+                session['id'],
+                st,
+            )
+            
         st.divider()
 else:
     st.info("No previous sessions found. Start a new session to see it here.")
