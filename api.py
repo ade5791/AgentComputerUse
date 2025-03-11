@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, List, Any
 import uvicorn
+import base64
+from datetime import datetime
 
 from browser_automation import BrowserAutomation
 from mock_browser_automation import MockBrowserAutomation
@@ -112,6 +114,14 @@ class ApiResponse(BaseModel):
     success: bool
     message: str
     data: Optional[Dict[str, Any]] = None
+    
+class SessionReplayData(BaseModel):
+    session_id: str
+    screenshots: List[Dict[str, Any]] = []
+    actions: List[Dict[str, Any]] = []
+    reasoning_data: List[Dict[str, Any]] = []
+    logs: List[Dict[str, Any]] = []
+    metadata: Optional[Dict[str, Any]] = None
 
 # Helper function to add logs
 def add_log(session_id, message):
@@ -923,6 +933,61 @@ async def cleanup_old_sessions(days_old: int = 7):
         message=f"Cleaned up {cleaned_count} sessions older than {days_old} days",
         data={"cleaned_count": cleaned_count}
     )
+
+@app.get("/api/sessions/{session_id}/replay", response_model=SessionReplayData)
+async def get_session_replay_data(session_id: str):
+    """
+    Get all session data needed for replay functionality.
+    
+    This endpoint returns all screenshots, actions, reasoning data, and logs
+    for a complete session replay experience.
+    """
+    # Verify session exists
+    session_data = session_manager.get_session(session_id)
+    if not session_data:
+        raise HTTPException(status_code=404, detail=f"Session with ID {session_id} not found")
+    
+    # Extract the necessary data for replaying the session
+    try:
+        # Get screenshots with proper timestamps
+        screenshots = session_data.get("screenshots", [])
+        
+        # Get actions from the actions_history
+        actions = []
+        for action_record in session_data.get("actions_history", []):
+            if isinstance(action_record, dict) and "action" in action_record:
+                actions.append(action_record)
+        
+        # Get reasoning data
+        reasoning_data = session_data.get("reasoning_data", [])
+        
+        # Get logs
+        logs = session_data.get("logs", [])
+        
+        # Metadata includes general session information
+        metadata = {
+            "task": session_data.get("task", "No task specified"),
+            "environment": session_data.get("environment", "unknown"),
+            "status": session_data.get("status", "unknown"),
+            "created_at": session_data.get("created_at", "unknown"),
+            "completed_at": session_data.get("completed_at", None),
+            "duration_seconds": session_data.get("duration_seconds", None),
+        }
+        
+        # Return the replay data
+        return SessionReplayData(
+            session_id=session_id,
+            screenshots=screenshots,
+            actions=actions,
+            reasoning_data=reasoning_data,
+            logs=logs,
+            metadata=metadata
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error preparing session replay data: {str(e)}"
+        )
 
 @app.get("/api/health", response_model=ApiResponse)
 async def health_check():
