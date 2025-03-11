@@ -44,6 +44,8 @@ if 'session_manager' not in st.session_state:
     st.session_state.session_manager = SessionManager()
 if 'current_session_id' not in st.session_state:
     st.session_state.current_session_id = None
+if 'current_task_id' not in st.session_state:
+    st.session_state.current_task_id = None
 # Safety check related state variables
 if 'pending_safety_checks' not in st.session_state:
     st.session_state.pending_safety_checks = None
@@ -256,14 +258,18 @@ def start_agent():
         "starting_url": st.session_state.starting_url
     }
     
-    session_id = st.session_state.session_manager.create_session(
+    session_info = st.session_state.session_manager.create_session(
         task=st.session_state.task,
         environment=st.session_state.environment,
         browser_config=browser_config
     )
     
+    session_id = session_info["session_id"]
+    task_id = session_info["task_id"]
+    
     st.session_state.current_session_id = session_id
-    add_log(f"Created new session: {session_id}")
+    st.session_state.current_task_id = task_id
+    add_log(f"Created new session: {session_id} (Task ID: {task_id})")
     
     # Initialize browser if not already running
     if not st.session_state.browser:
