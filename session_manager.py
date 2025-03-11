@@ -86,7 +86,8 @@ class SessionManager:
             "is_paused": False,
             "is_completed": False,
             "completion_time": None,
-            "error": None
+            "error": None,
+            "reasoning_data": []
         }
         
         self._save_session(session_id, session_data)
@@ -590,6 +591,65 @@ class SessionManager:
             updates["error"] = error
             
         return self.update_session(session_id, updates)
+    
+    def add_reasoning_data(self, session_id, reasoning_data):
+        """
+        Add reasoning data from the model to a session.
+        
+        Args:
+            session_id (str): The session ID.
+            reasoning_data (dict): The reasoning data to add.
+            
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        # Ensure we have a lock for this session
+        if session_id not in self.session_locks:
+            self.session_locks[session_id] = threading.Lock()
+            
+        # Acquire the lock before updating
+        with self.session_locks[session_id]:
+            # Check cache first for performance
+            with self.cache_lock:
+                if session_id in self.session_cache:
+                    session_data = self.session_cache[session_id]
+                else:
+                    session_data = self.get_session(session_id)
+                    if session_data:
+                        self.session_cache[session_id] = session_data
+                        
+            if not session_data:
+                return False
+                
+            # Add timestamp to reasoning data
+            now = datetime.now()
+            timestamp_iso = now.isoformat()
+            
+            reasoning_item = {
+                "id": str(uuid.uuid4()),
+                "timestamp": timestamp_iso,
+                "content": reasoning_data
+            }
+            
+            if "reasoning_data" not in session_data:
+                session_data["reasoning_data"] = []
+                
+            session_data["reasoning_data"].append(reasoning_item)
+            
+            # Limit the number of reasoning items to prevent file size growth
+            if len(session_data["reasoning_data"]) > 50:
+                session_data["reasoning_data"] = session_data["reasoning_data"][-50:]
+                
+            # Update the last updated timestamp
+            session_data["updated_at"] = timestamp_iso
+            
+            self._save_session(session_id, session_data)
+            
+            # Update cache
+            with self.cache_lock:
+                self.session_cache[session_id] = session_data
+                
+            return True
     
     def add_safety_check(self, session_id, safety_check_data):
         """

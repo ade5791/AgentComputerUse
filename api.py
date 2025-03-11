@@ -501,13 +501,24 @@ async def get_session_status(session_id: str, task_id: str):
         current_screenshot = None
         if session_data.get("screenshots") and len(session_data["screenshots"]) > 0:
             current_screenshot = session_data["screenshots"][-1]["data"]
+        
+        # Get reasoning data from stored session
+        reasoning_items = None
+        if session_data.get("reasoning_data"):
+            reasoning_items = []
+            for item in session_data.get("reasoning_data", []):
+                reasoning_items.append(ReasoningItem(
+                    id=item.get("id", str(uuid.uuid4())),
+                    content=item.get("content", [])
+                ))
             
         return StatusResponse(
             session_id=session_id,
             task_id="completed",  # This is a completed session, so we don't have the original task_id
             status=session_data.get("status", "unknown"),
             logs=logs,
-            current_screenshot=current_screenshot
+            current_screenshot=current_screenshot,
+            reasoning=reasoning_items
         )
     
     # Get session data from active sessions
