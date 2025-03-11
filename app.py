@@ -10,6 +10,7 @@ import os
 # Import the reasoning capture module
 from reasoning_capture import ReasoningCapture, extract_reasoning_data as rc_extract_reasoning_data, capture_after_screenshot
 from reasoning_helper import process_screenshot_response, process_initial_response, process_safety_checks
+from enhanced_agent import enhanced_agent_loop, enhanced_agent_loop_with_response
 
 from browser_automation import BrowserAutomation
 from mock_browser_automation import MockBrowserAutomation
@@ -372,9 +373,36 @@ def start_agent():
         display_height=st.session_state.display_height
     )
     
+    # Define the enhanced agent loop wrapper function
+    def enhanced_agent_wrapper():
+        try:
+            # Call the enhanced agent loop
+            result = enhanced_agent_loop(
+                session_manager=st.session_state.session_manager,
+                session_id=st.session_state.current_session_id,
+                task_id=st.session_state.current_task_id,
+                browser=st.session_state.browser,
+                agent=st.session_state.agent,
+                task=st.session_state.task,
+                add_log=add_log,
+                stop_signal_getter=lambda: st.session_state.stop_agent
+            )
+            
+            # Handle safety checks if needed
+            if result and result.get("status") == "safety_check":
+                st.session_state.pending_safety_checks = result.get("safety_checks")
+                st.session_state.pending_safety_response_id = result.get("response_id")
+                st.session_state.pending_safety_call_id = result.get("call_id")
+                st.session_state.awaiting_safety_confirmation = True
+                
+        except Exception as e:
+            add_log(f"Error in enhanced agent wrapper: {str(e)}")
+        finally:
+            st.session_state.agent_running = False
+    
     # Start the agent loop in a separate thread
     st.session_state.agent_running = True
-    st.session_state.agent_thread = threading.Thread(target=agent_loop)
+    st.session_state.agent_thread = threading.Thread(target=enhanced_agent_wrapper)
     st.session_state.agent_thread.daemon = True
     st.session_state.agent_thread.start()
 
@@ -408,24 +436,43 @@ def confirm_safety_checks():
         return
     
     try:
-        # Acknowledge the safety checks
-        response = st.session_state.agent.acknowledge_safety_checks(
-            st.session_state.pending_safety_response_id,
-            st.session_state.pending_safety_call_id,
-            st.session_state.pending_safety_checks
-        )
+        # Define the enhanced agent continuation function
+        def enhanced_continuation_wrapper():
+            try:
+                # Continue the agent loop with the initial response after safety check
+                result = enhanced_agent_loop_with_response(
+                    session_manager=st.session_state.session_manager,
+                    session_id=st.session_state.current_session_id,
+                    task_id=st.session_state.current_task_id,
+                    browser=st.session_state.browser,
+                    agent=st.session_state.agent,
+                    initial_response=st.session_state.pending_safety_response_id,
+                    initial_call_id=st.session_state.pending_safety_call_id,
+                    safety_checks=st.session_state.pending_safety_checks,
+                    add_log=add_log,
+                    stop_signal_getter=lambda: st.session_state.stop_agent
+                )
+                
+                # Handle safety checks if needed
+                if result and result.get("status") == "safety_check":
+                    st.session_state.pending_safety_checks = result.get("safety_checks")
+                    st.session_state.pending_safety_response_id = result.get("response_id")
+                    st.session_state.pending_safety_call_id = result.get("call_id")
+                    st.session_state.awaiting_safety_confirmation = True
+                    
+            except Exception as e:
+                add_log(f"Error in enhanced continuation wrapper: {str(e)}")
+            finally:
+                st.session_state.agent_running = False
         
         add_log("Safety checks acknowledged by user. Continuing task execution.")
         
         # Reset safety check state
         st.session_state.awaiting_safety_confirmation = False
-        st.session_state.pending_safety_checks = None
-        st.session_state.pending_safety_response_id = None
-        st.session_state.pending_safety_call_id = None
         
         # Continue agent execution
         st.session_state.agent_running = True
-        st.session_state.agent_thread = threading.Thread(target=lambda: agent_loop_with_response(response))
+        st.session_state.agent_thread = threading.Thread(target=enhanced_continuation_wrapper)
         st.session_state.agent_thread.daemon = True
         st.session_state.agent_thread.start()
     except Exception as e:
