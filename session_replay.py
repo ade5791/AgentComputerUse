@@ -11,6 +11,8 @@ import base64
 from PIL import Image
 import io
 import json
+from datetime import datetime
+import pandas as pd
 
 def load_session_replay(session_id, session_manager):
     """
@@ -44,8 +46,20 @@ def load_session_replay(session_id, session_manager):
     
     # Prepare data for replay
     screenshots = session_data.get('screenshots', [])
-    actions = session_data.get('actions', [])
+    actions_history = session_data.get('actions_history', [])
     reasoning_data = session_data.get('reasoning_data', [])
+    
+    # Process actions from actions_history
+    actions = []
+    for action_record in actions_history:
+        if isinstance(action_record, dict) and 'action' in action_record:
+            action_data = action_record['action']
+            timestamp = action_record.get('timestamp', '')
+            
+            # Add timestamp to action for proper sequencing
+            if isinstance(action_data, dict):
+                action_data['timestamp'] = timestamp
+                actions.append(action_data)
     
     if not screenshots:
         st.warning("No screenshots available for replay")
@@ -127,19 +141,60 @@ def load_session_replay(session_id, session_manager):
         if not actions:
             return None
             
-        screenshot_timestamp = screenshots[screenshot_index].get('timestamp', 0)
+        if screenshot_index >= len(screenshots):
+            return None
+            
+        screenshot = screenshots[screenshot_index]
+        screenshot_timestamp = None
+        
+        # Extract timestamp from screenshot data
+        if isinstance(screenshot, dict):
+            if 'timestamp' in screenshot:
+                screenshot_timestamp = screenshot['timestamp']
+            elif 'created_at' in screenshot:
+                screenshot_timestamp = screenshot['created_at']
+                
+        if screenshot_timestamp is None:
+            return None
+            
+        # Parse timestamps to make them comparable
+        if isinstance(screenshot_timestamp, str):
+            try:
+                # Try to parse ISO format timestamp
+                from datetime import datetime
+                screenshot_timestamp = datetime.fromisoformat(screenshot_timestamp.replace('Z', '+00:00'))
+            except (ValueError, TypeError):
+                pass
         
         # Find the action that happened just before or at the same time as the screenshot
         closest_action = None
         min_diff = float('inf')
         
         for action in actions:
-            action_timestamp = action.get('timestamp', 0)
-            diff = abs(screenshot_timestamp - action_timestamp)
+            if not isinstance(action, dict):
+                continue
+                
+            action_timestamp = action.get('timestamp', None)
+            if action_timestamp is None:
+                continue
+                
+            # Parse action timestamp if it's a string
+            if isinstance(action_timestamp, str):
+                try:
+                    action_timestamp = datetime.fromisoformat(action_timestamp.replace('Z', '+00:00'))
+                except (ValueError, TypeError):
+                    continue
             
-            if action_timestamp <= screenshot_timestamp and diff < min_diff:
-                min_diff = diff
-                closest_action = action
+            # Calculate time difference
+            try:
+                diff = abs((screenshot_timestamp - action_timestamp).total_seconds())
+                
+                # Action should happen before or very close to the screenshot
+                if diff < min_diff:
+                    min_diff = diff
+                    closest_action = action
+            except (TypeError, AttributeError):
+                continue
                 
         return closest_action
     
@@ -148,19 +203,60 @@ def load_session_replay(session_id, session_manager):
         if not reasoning_data:
             return None
             
-        screenshot_timestamp = screenshots[screenshot_index].get('timestamp', 0)
+        if screenshot_index >= len(screenshots):
+            return None
+            
+        screenshot = screenshots[screenshot_index]
+        screenshot_timestamp = None
+        
+        # Extract timestamp from screenshot data
+        if isinstance(screenshot, dict):
+            if 'timestamp' in screenshot:
+                screenshot_timestamp = screenshot['timestamp']
+            elif 'created_at' in screenshot:
+                screenshot_timestamp = screenshot['created_at']
+                
+        if screenshot_timestamp is None:
+            return None
+            
+        # Parse timestamps to make them comparable
+        if isinstance(screenshot_timestamp, str):
+            try:
+                # Try to parse ISO format timestamp
+                from datetime import datetime
+                screenshot_timestamp = datetime.fromisoformat(screenshot_timestamp.replace('Z', '+00:00'))
+            except (ValueError, TypeError):
+                pass
         
         # Find reasoning data that happened close to the screenshot timestamp
         closest_reasoning = None
         min_diff = float('inf')
         
         for reasoning in reasoning_data:
-            reasoning_timestamp = reasoning.get('timestamp', 0)
-            diff = abs(screenshot_timestamp - reasoning_timestamp)
+            if not isinstance(reasoning, dict):
+                continue
+                
+            reasoning_timestamp = reasoning.get('timestamp', None)
+            if reasoning_timestamp is None:
+                continue
+                
+            # Parse reasoning timestamp if it's a string
+            if isinstance(reasoning_timestamp, str):
+                try:
+                    reasoning_timestamp = datetime.fromisoformat(reasoning_timestamp.replace('Z', '+00:00'))
+                except (ValueError, TypeError):
+                    continue
             
-            if diff < min_diff:
-                min_diff = diff
-                closest_reasoning = reasoning
+            # Calculate time difference
+            try:
+                diff = abs((screenshot_timestamp - reasoning_timestamp).total_seconds())
+                
+                # Find the closest reasoning data in time
+                if diff < min_diff:
+                    min_diff = diff
+                    closest_reasoning = reasoning
+            except (TypeError, AttributeError):
+                continue
                 
         return closest_reasoning
     
