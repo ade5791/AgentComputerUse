@@ -36,7 +36,21 @@ class BrowserAutomation:
         Start the browser asynchronously.
         """
         self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(headless=self.headless)
+        self.browser = await self.playwright.chromium.launch(
+            headless=self.headless,
+            args=[
+                "--disable-extensions",
+                "--disable-file-system",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-accelerated-2d-canvas",
+                "--no-first-run",
+                "--no-zygote",
+                "--single-process",
+                "--disable-gpu"
+            ]
+        )
         self.context = await self.browser.new_context(
             viewport={"width": self.width, "height": self.height}
         )

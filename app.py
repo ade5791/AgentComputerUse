@@ -310,7 +310,7 @@ with st.sidebar:
         value=768
     )
     
-    st.session_state.headless = st.checkbox("Headless Browser", value=False)
+    st.session_state.headless = st.checkbox("Headless Browser", value=True)
     
     st.session_state.starting_url = st.text_input(
         "Starting URL",
