@@ -230,80 +230,187 @@ def load_dashboard():
         
         reasoning_data = session_data.get("reasoning_data", [])
         if reasoning_data:
-            # Show number of reasoning entries
-            st.info(f"This session contains {len(reasoning_data)} reasoning data entries.")
+            # Show number of reasoning entries and metrics
+            metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+            with metrics_col1:
+                st.metric("Total Reasoning Events", len(reasoning_data))
             
-            # Create a dataframe for visualizing reasoning data frequency
-            reasoning_df = pd.DataFrame({
-                "Timestamp": [item.get("timestamp", "unknown") for item in reasoning_data],
-                "ID": [item.get("id", "unknown") for item in reasoning_data]
-            })
+            # Calculate average reasoning data size
+            avg_size = sum([len(json.dumps(item.get("content", {}))) for item in reasoning_data]) / len(reasoning_data)
+            with metrics_col2:
+                st.metric("Avg Content Size", f"{avg_size:.0f} chars")
             
-            # Add a timeline visualization to show when reasoning occurred
-            timeline_chart = alt.Chart(reasoning_df).mark_circle(size=100).encode(
-                x=alt.X("Timestamp:N", title="Time"),
-                y=alt.Y("index:O", title="Reasoning Event", axis=None),
-                tooltip=["Timestamp", "ID"]
-            ).properties(
-                width=700,
-                height=100,
-                title="Reasoning Event Timeline"
-            )
+            # Calculate time span of reasoning data
+            try:
+                timestamps = [datetime.fromisoformat(item.get("timestamp")) for item in reasoning_data 
+                             if item.get("timestamp") and "T" in item.get("timestamp")]
+                if timestamps:
+                    time_span = max(timestamps) - min(timestamps)
+                    with metrics_col3:
+                        st.metric("Time Span", f"{time_span.total_seconds():.1f} sec")
+            except:
+                with metrics_col3:
+                    st.metric("Time Span", "Unknown")
             
-            st.altair_chart(timeline_chart, use_container_width=True)
+            # Add search functionality for reasoning data
+            search_query = st.text_input("Search reasoning data content:", 
+                                        placeholder="Enter keywords to search...")
             
-            # Create a dropdown to select reasoning data by timestamp
-            reasoning_timestamps = [item.get("timestamp", "unknown") for item in reasoning_data]
-            selected_timestamp = st.selectbox(
-                "Select reasoning data by timestamp:",
-                options=reasoning_timestamps,
-                index=0
-            )
-            
-            # Get the selected reasoning data
-            selected_data = None
-            for item in reasoning_data:
-                if item.get("timestamp") == selected_timestamp:
-                    selected_data = item
-                    break
-            
-            if selected_data:
-                st.subheader("Detailed Reasoning")
+            # Filter reasoning data based on search
+            filtered_reasoning_data = reasoning_data
+            if search_query:
+                filtered_reasoning_data = []
+                for item in reasoning_data:
+                    content_str = json.dumps(item.get("content", {})).lower()
+                    if search_query.lower() in content_str:
+                        filtered_reasoning_data.append(item)
                 
-                # Display reasoning content
-                reasoning_id = selected_data.get("id", "Unknown ID")
-                st.caption(f"Reasoning ID: {reasoning_id}")
+                st.info(f"Found {len(filtered_reasoning_data)} matching reasoning events")
+            
+            # Create a dataframe for visualizing reasoning data
+            if filtered_reasoning_data:
+                reasoning_df = pd.DataFrame({
+                    "Timestamp": [item.get("timestamp", "unknown") for item in filtered_reasoning_data],
+                    "ID": [item.get("id", "unknown") for item in filtered_reasoning_data],
+                    "Content Size": [len(json.dumps(item.get("content", {}))) for item in filtered_reasoning_data]
+                })
                 
-                content = selected_data.get("content", {})
-                if content:
-                    # Create expandable sections for different content parts
-                    with st.expander("Reasoning Content", expanded=True):
-                        # Convert to formatted JSON for better readability
-                        st.json(content)
-                    
-                    # Extract decision points and rationale if available
-                    if isinstance(content, dict):
-                        if "decision_points" in content:
-                            with st.expander("Decision Points"):
-                                for i, decision in enumerate(content.get("decision_points", [])):
-                                    st.markdown(f"**Decision {i+1}:** {decision}")
-                        
-                        if "rationale" in content:
-                            with st.expander("Rationale"):
-                                st.markdown(content.get("rationale", ""))
-                    
-                    # Add download button for the reasoning data
-                    json_data = json.dumps(content, indent=2)
-                    st.download_button(
-                        label="Download Reasoning Data",
-                        data=json_data,
-                        file_name=f"reasoning_{reasoning_id}.json",
-                        mime="application/json"
+                # Add a timeline visualization to show when reasoning occurred
+                timeline_chart = alt.Chart(reasoning_df).mark_circle().encode(
+                    x=alt.X("Timestamp:N", title="Time"),
+                    y=alt.Y("index:O", title="Reasoning Event", axis=None),
+                    size=alt.Size("Content Size:Q", scale=alt.Scale(range=[50, 200])),
+                    color=alt.Color("Content Size:Q", scale=alt.Scale(scheme="viridis")),
+                    tooltip=["Timestamp", "ID", "Content Size"]
+                ).properties(
+                    width=700,
+                    height=100,
+                    title="Reasoning Event Timeline"
+                )
+                
+                st.altair_chart(timeline_chart, use_container_width=True)
+                
+                # Create tabs for different reasoning visualizations
+                reason_viz_tab1, reason_viz_tab2 = st.tabs(["Detail View", "Relationship View"])
+                
+                # Tab 1: Detail View - shows individual reasoning entries
+                with reason_viz_tab1:
+                    # Create a dropdown to select reasoning data by timestamp
+                    reasoning_timestamps = [item.get("timestamp", "unknown") for item in filtered_reasoning_data]
+                    selected_timestamp = st.selectbox(
+                        "Select reasoning data by timestamp:",
+                        options=reasoning_timestamps,
+                        index=0
                     )
-                else:
-                    st.warning("This reasoning entry has no content data.")
+                    
+                    # Get the selected reasoning data
+                    selected_data = None
+                    for item in filtered_reasoning_data:
+                        if item.get("timestamp") == selected_timestamp:
+                            selected_data = item
+                            break
+                    
+                    if selected_data:
+                        st.subheader("Detailed Reasoning")
+                        
+                        # Display reasoning content
+                        reasoning_id = selected_data.get("id", "Unknown ID")
+                        st.caption(f"Reasoning ID: {reasoning_id}")
+                        
+                        content = selected_data.get("content", {})
+                        if content:
+                            # Create expandable sections for different content parts
+                            with st.expander("Reasoning Content", expanded=True):
+                                # Convert to formatted JSON for better readability
+                                st.json(content)
+                            
+                            # Extract decision points and rationale if available
+                            if isinstance(content, dict):
+                                if "decision_points" in content:
+                                    with st.expander("Decision Points"):
+                                        for i, decision in enumerate(content.get("decision_points", [])):
+                                            st.markdown(f"**Decision {i+1}:** {decision}")
+                                
+                                if "rationale" in content:
+                                    with st.expander("Rationale"):
+                                        st.markdown(content.get("rationale", ""))
+                                        
+                                if "alternatives_considered" in content:
+                                    with st.expander("Alternatives Considered"):
+                                        for i, alternative in enumerate(content.get("alternatives_considered", [])):
+                                            st.markdown(f"**Alternative {i+1}:** {alternative}")
+                            
+                            # Add download button for the reasoning data
+                            json_data = json.dumps(content, indent=2)
+                            st.download_button(
+                                label="Download Reasoning Data",
+                                data=json_data,
+                                file_name=f"reasoning_{reasoning_id}.json",
+                                mime="application/json"
+                            )
+                        else:
+                            st.warning("This reasoning entry has no content data.")
+                    else:
+                        st.error("Failed to find the selected reasoning data.")
+                
+                # Tab 2: Relationship View - shows relationship between actions and reasoning
+                with reason_viz_tab2:
+                    st.subheader("Action-Reasoning Relationship")
+                    
+                    # Extract actions and timestamps from logs
+                    actions = []
+                    action_timestamps = []
+                    
+                    for log in session_data.get("logs", []):
+                        message = log.get("message", "")
+                        if "Executing action:" in message:
+                            try:
+                                action_type = message.split("Executing action:")[1].split("(Call ID")[0].strip()
+                                timestamp = log.get("timestamp", "00:00:00")
+                                actions.append(action_type)
+                                action_timestamps.append(timestamp)
+                            except:
+                                pass
+                    
+                    if actions and action_timestamps:
+                        # Create combined timeline with both actions and reasoning
+                        action_df = pd.DataFrame({
+                            "Timestamp": action_timestamps,
+                            "Event": actions,
+                            "Type": ["Action"] * len(actions)
+                        })
+                        
+                        reasoning_timeline_df = pd.DataFrame({
+                            "Timestamp": [item.get("timestamp", "unknown") for item in filtered_reasoning_data],
+                            "Event": [f"Reasoning {i+1}" for i in range(len(filtered_reasoning_data))],
+                            "Type": ["Reasoning"] * len(filtered_reasoning_data)
+                        })
+                        
+                        # Combine the dataframes
+                        combined_df = pd.concat([action_df, reasoning_timeline_df])
+                        
+                        # Create the chart
+                        combined_chart = alt.Chart(combined_df).mark_circle(size=100).encode(
+                            x=alt.X("Timestamp:N", title="Timeline"),
+                            y=alt.Y("Event:N", title="Event"),
+                            color=alt.Color("Type:N", scale=alt.Scale(domain=["Action", "Reasoning"], 
+                                                                     range=["#5470c6", "#91cc75"])),
+                            tooltip=["Timestamp", "Event", "Type"]
+                        ).properties(
+                            width=700,
+                            height=400,
+                            title="Actions and Reasoning Timeline"
+                        )
+                        
+                        st.altair_chart(combined_chart, use_container_width=True)
+                        
+                        # Add explanation
+                        st.info("This visualization shows the relationship between agent actions and reasoning events. " +
+                               "It helps understand how reasoning decisions translate into specific actions.")
+                    else:
+                        st.info("Not enough action data to create a relationship visualization.")
             else:
-                st.error("Failed to find the selected reasoning data.")
+                st.warning("No reasoning data matches your search criteria.")
         else:
             st.info("No reasoning data available for this session.")
     
