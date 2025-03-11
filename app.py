@@ -8,10 +8,11 @@ from PIL import Image
 import os
 
 from browser_automation import BrowserAutomation
+from mock_browser_automation import MockBrowserAutomation
 from computer_use_agent import ComputerUseAgent
 from utils import get_screenshot_as_base64
 from session_manager import SessionManager
-from setup_app import check_install_dependencies
+from setup_app import check_install_dependencies, get_browser_environment
 
 # Check and install dependencies when app starts
 check_install_dependencies()
@@ -249,16 +250,46 @@ def start_agent():
     # Initialize browser if not already running
     if not st.session_state.browser:
         try:
-            st.session_state.browser = BrowserAutomation(
-                headless=st.session_state.headless,
-                width=st.session_state.display_width,
-                height=st.session_state.display_height,
-                starting_url=st.session_state.starting_url
-            )
+            # Check which browser automation to use
+            browser_env = get_browser_environment()
+            
+            if browser_env == "mock":
+                add_log("Using mock browser automation (Playwright not available in this environment)")
+                st.session_state.browser = MockBrowserAutomation(
+                    headless=st.session_state.headless,
+                    width=st.session_state.display_width,
+                    height=st.session_state.display_height,
+                    starting_url=st.session_state.starting_url
+                )
+            else:
+                add_log("Using real browser automation with Playwright")
+                st.session_state.browser = BrowserAutomation(
+                    headless=st.session_state.headless,
+                    width=st.session_state.display_width,
+                    height=st.session_state.display_height,
+                    starting_url=st.session_state.starting_url
+                )
+                
             add_log(f"Browser started and navigated to {st.session_state.starting_url}")
         except Exception as e:
-            st.error(f"Failed to start browser: {str(e)}")
-            return
+            error_message = f"Failed to start browser: {str(e)}"
+            add_log(error_message)
+            
+            # Try with mock browser as fallback
+            try:
+                add_log("Trying with mock browser as fallback...")
+                st.session_state.browser = MockBrowserAutomation(
+                    headless=st.session_state.headless,
+                    width=st.session_state.display_width,
+                    height=st.session_state.display_height,
+                    starting_url=st.session_state.starting_url
+                )
+                add_log("Mock browser started successfully as fallback")
+            except Exception as e2:
+                error_message = f"Failed to start browser even with fallback: {str(e)} -> {str(e2)}"
+                add_log(error_message)
+                st.error(error_message)
+                return
     
     # Initialize the Computer Use Agent
     st.session_state.agent = ComputerUseAgent(

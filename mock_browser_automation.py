@@ -39,11 +39,11 @@ class MockBrowserAutomation:
         draw = ImageDraw.Draw(self.image)
         
         # Add URL bar
-        draw.rectangle([(0, 0), (self.width, 40)], fill=(240, 240, 240))
+        draw.rectangle(((0, 0), (self.width, 40)), fill=(240, 240, 240))
         draw.text((10, 10), f"URL: {self.current_url}", fill=(0, 0, 0))
         
         # Add page content
-        draw.rectangle([(0, 40), (self.width, 80)], fill=(230, 230, 230))
+        draw.rectangle(((0, 40), (self.width, 80)), fill=(230, 230, 230))
         draw.text((10, 50), "Mock Browser - Simulated Content", fill=(0, 0, 0))
         
         # Add info about the current state
