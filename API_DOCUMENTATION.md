@@ -515,3 +515,48 @@ When a session times out:
 - A log entry is added to document the timeout event
 
 You can restart a timed-out session by creating a new session with the same task.
+
+## Reasoning Data Visualization
+
+The Computer Use Agent captures detailed reasoning data from the model during session execution, providing insights into the agent's decision-making process. This data is accessible through:
+
+1. **REST API**: Reasoning data is included in session status responses and session details
+2. **Dashboard UI**: A dedicated visualization tab displays reasoning data with interactive elements
+
+### Reasoning Data Structure
+
+Reasoning data is structured as follows:
+
+```json
+{
+  "id": "reason_uuid123",
+  "timestamp": "2025-03-11T10:15:32Z",
+  "content": {
+    "decision_points": [
+      "I need to search for information about pizza restaurants in New York",
+      "Looking at the search results, I should click on the Yelp link"
+    ],
+    "rationale": "Yelp provides comprehensive reviews and rankings that will help find the best pizza places",
+    "alternatives_considered": [
+      "Could use Google Maps directly",
+      "Could look at individual restaurant websites"
+    ]
+  }
+}
+```
+
+### Dashboard Visualization Features
+
+The dashboard provides several ways to interact with reasoning data:
+
+- **Timeline View**: Shows reasoning events on a timeline to correlate with actions
+- **Detail View**: Allows exploring the content of individual reasoning items
+- **JSON Export**: Download reasoning data for further analysis
+- **Filtering**: Search and filter reasoning data based on content or timestamps
+
+This feature helps users understand how the agent makes decisions, which can be valuable for:
+
+- Debugging unexpected behaviors
+- Improving task instructions
+- Training better models
+- Ensuring transparency in automated processes

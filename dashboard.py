@@ -53,7 +53,7 @@ def load_dashboard():
     
     # Display session overview
     st.header("Session Overview")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Status", session_data.get("status", "unknown"))
@@ -73,13 +73,17 @@ def load_dashboard():
         else:
             duration_str = "Unknown"
         st.metric("Duration", duration_str)
+    with col4:
+        # Display the count of reasoning data entries
+        reasoning_count = len(session_data.get("reasoning_data", []))
+        st.metric("Reasoning Data", f"{reasoning_count} entries")
     
     # Task description
     st.subheader("Task")
     st.info(session_data.get("task", "No task description available"))
     
     # Tabs for different visualizations
-    tab1, tab2, tab3, tab4 = st.tabs(["Action Timeline", "Screenshots", "Logs", "Performance"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Action Timeline", "Screenshots", "Logs", "Reasoning", "Performance"])
     
     # Tab 1: Action Timeline
     with tab1:
@@ -220,8 +224,91 @@ def load_dashboard():
         else:
             st.info("No logs available for this session.")
     
-    # Tab 4: Performance
+    # Tab 4: Reasoning Data
     with tab4:
+        st.subheader("Agent Reasoning Data")
+        
+        reasoning_data = session_data.get("reasoning_data", [])
+        if reasoning_data:
+            # Show number of reasoning entries
+            st.info(f"This session contains {len(reasoning_data)} reasoning data entries.")
+            
+            # Create a dataframe for visualizing reasoning data frequency
+            reasoning_df = pd.DataFrame({
+                "Timestamp": [item.get("timestamp", "unknown") for item in reasoning_data],
+                "ID": [item.get("id", "unknown") for item in reasoning_data]
+            })
+            
+            # Add a timeline visualization to show when reasoning occurred
+            timeline_chart = alt.Chart(reasoning_df).mark_circle(size=100).encode(
+                x=alt.X("Timestamp:N", title="Time"),
+                y=alt.Y("index:O", title="Reasoning Event", axis=None),
+                tooltip=["Timestamp", "ID"]
+            ).properties(
+                width=700,
+                height=100,
+                title="Reasoning Event Timeline"
+            )
+            
+            st.altair_chart(timeline_chart, use_container_width=True)
+            
+            # Create a dropdown to select reasoning data by timestamp
+            reasoning_timestamps = [item.get("timestamp", "unknown") for item in reasoning_data]
+            selected_timestamp = st.selectbox(
+                "Select reasoning data by timestamp:",
+                options=reasoning_timestamps,
+                index=0
+            )
+            
+            # Get the selected reasoning data
+            selected_data = None
+            for item in reasoning_data:
+                if item.get("timestamp") == selected_timestamp:
+                    selected_data = item
+                    break
+            
+            if selected_data:
+                st.subheader("Detailed Reasoning")
+                
+                # Display reasoning content
+                reasoning_id = selected_data.get("id", "Unknown ID")
+                st.caption(f"Reasoning ID: {reasoning_id}")
+                
+                content = selected_data.get("content", {})
+                if content:
+                    # Create expandable sections for different content parts
+                    with st.expander("Reasoning Content", expanded=True):
+                        # Convert to formatted JSON for better readability
+                        st.json(content)
+                    
+                    # Extract decision points and rationale if available
+                    if isinstance(content, dict):
+                        if "decision_points" in content:
+                            with st.expander("Decision Points"):
+                                for i, decision in enumerate(content.get("decision_points", [])):
+                                    st.markdown(f"**Decision {i+1}:** {decision}")
+                        
+                        if "rationale" in content:
+                            with st.expander("Rationale"):
+                                st.markdown(content.get("rationale", ""))
+                    
+                    # Add download button for the reasoning data
+                    json_data = json.dumps(content, indent=2)
+                    st.download_button(
+                        label="Download Reasoning Data",
+                        data=json_data,
+                        file_name=f"reasoning_{reasoning_id}.json",
+                        mime="application/json"
+                    )
+                else:
+                    st.warning("This reasoning entry has no content data.")
+            else:
+                st.error("Failed to find the selected reasoning data.")
+        else:
+            st.info("No reasoning data available for this session.")
+    
+    # Tab 5: Performance
+    with tab5:
         st.subheader("Session Performance Metrics")
         
         logs = session_data.get("logs", [])

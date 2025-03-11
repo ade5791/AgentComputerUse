@@ -375,8 +375,10 @@ class SessionManager:
                                 "priority": session_data.get("priority", "normal"),
                                 "logs_count": len(session_data.get("logs", [])),
                                 "screenshots_count": len(session_data.get("screenshots", [])),
+                                "reasoning_data_count": len(session_data.get("reasoning_data", [])),
                                 "current_url": session_data.get("current_url", ""),
-                                "has_error": bool(session_data.get("error", False))
+                                "has_error": bool(session_data.get("error", False)),
+                                "has_reasoning_data": len(session_data.get("reasoning_data", [])) > 0
                             }
                             
                             sessions.append(summary)
