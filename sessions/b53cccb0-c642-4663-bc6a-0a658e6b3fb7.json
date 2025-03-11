@@ -1,0 +1,21 @@
+{
+  "id": "b53cccb0-c642-4663-bc6a-0a658e6b3fb7",
+  "created_at": "2025-03-11T19:28:12.842026",
+  "task": "find the latest new in open ai",
+  "environment": "browser",
+  "browser_config": {
+    "environment": "browser",
+    "display_width": 1024,
+    "display_height": 768,
+    "headless": false,
+    "starting_url": "https://www.google.com"
+  },
+  "status": "created",
+  "logs": [
+    {
+      "timestamp": "2025-03-11T19:28:12.844061",
+      "message": "[19:28:12] Created new session: b53cccb0-c642-4663-bc6a-0a658e6b3fb7"
+    }
+  ],
+  "screenshots": []
+}

@@ -1,5 +1,14 @@
 {pkgs}: {
   deps = [
+    pkgs.mesa
+    pkgs.at-spi2-atk
+    pkgs.dbus
+    pkgs.cairo
+    pkgs.pango
+    pkgs.libdrm
+    pkgs.alsa-lib
+    pkgs.gtk3
+    pkgs.nss
     pkgs.zlib
     pkgs.tk
     pkgs.tcl

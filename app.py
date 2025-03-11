@@ -371,7 +371,7 @@ if st.session_state.current_session_id:
     st.header("Session Information")
     session_link = st.session_state.session_manager.get_session_link(
         st.session_state.current_session_id,
-        base_url=f"http://{st.request.host}"
+        base_url="http://0.0.0.0:5000"
     )
     st.markdown(f"**Session ID:** {st.session_state.current_session_id}")
     st.markdown(f"**Shareable Link:** [Open Session]({session_link})")
@@ -394,7 +394,7 @@ if sessions:
         with col2:
             session_link = st.session_state.session_manager.get_session_link(
                 session['id'],
-                base_url=f"http://{st.request.host}"
+                base_url="http://0.0.0.0:5000"
             )
             st.button(
                 "View Session",
