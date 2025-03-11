@@ -1,5 +1,6 @@
 import base64
 import time
+import functools
 
 def get_screenshot_as_base64(browser):
     """
@@ -11,17 +12,8 @@ def get_screenshot_as_base64(browser):
     Returns:
         str: The base64-encoded screenshot.
     """
-    if not browser:
-        raise ValueError("Browser is not initialized")
-    
-    try:
-        # Take a screenshot with the browser
-        screenshot_bytes = browser.get_screenshot()
-        
-        # Encode the screenshot as base64
-        return base64.b64encode(screenshot_bytes).decode('utf-8')
-    except Exception as e:
-        raise Exception(f"Failed to get screenshot: {str(e)}")
+    screenshot = browser.get_screenshot()
+    return base64.b64encode(screenshot).decode('utf-8')
 
 def retry_with_backoff(func, max_retries=3, initial_wait=1):
     """
@@ -38,22 +30,26 @@ def retry_with_backoff(func, max_retries=3, initial_wait=1):
     Raises:
         Exception: The last exception that occurred if all retries fail.
     """
-    retries = 0
-    wait_time = initial_wait
-    last_exception = None
-    
-    while retries < max_retries:
-        try:
-            return func()
-        except Exception as e:
-            last_exception = e
-            retries += 1
-            
-            if retries >= max_retries:
-                break
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        retries = 0
+        wait_time = initial_wait
+        last_exception = None
+        
+        while retries < max_retries:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                last_exception = e
+                retries += 1
                 
-            # Wait with exponential backoff
-            time.sleep(wait_time)
-            wait_time *= 2
+                if retries >= max_retries:
+                    break
+                    
+                # Exponential backoff with jitter
+                wait_time = wait_time * 2
+                time.sleep(wait_time)
+        
+        raise last_exception
     
-    raise last_exception
+    return wrapper

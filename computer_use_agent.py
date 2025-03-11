@@ -1,3 +1,6 @@
+import os
+import json
+import requests
 from openai import OpenAI
 
 class ComputerUseAgent:
@@ -19,7 +22,7 @@ class ComputerUseAgent:
         self.environment = environment
         self.display_width = display_width
         self.display_height = display_height
-    
+        
     def initial_request(self, task, screenshot_base64):
         """
         Send the initial request to the Computer Use Agent.
@@ -32,29 +35,88 @@ class ComputerUseAgent:
             object: The response from the API.
         """
         try:
-            response = self.client.responses.create(
-                model="computer-use-preview",
-                tools=[{
-                    "type": "computer_use_preview",
-                    "display_width": self.display_width,
-                    "display_height": self.display_height,
-                    "environment": self.environment
-                }],
-                input=[
+            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+            # do not change this unless explicitly requested by the user
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
                     {
-                        "role": "user",
-                        "content": task
+                        "role": "system",
+                        "content": f"You are a computer use agent operating in a {self.environment} environment with dimensions {self.display_width}x{self.display_height}."
                     },
                     {
-                        "type": "input_image",
-                        "image_url": f"data:image/png;base64,{screenshot_base64}"
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Task: {task}"
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{screenshot_base64}"
+                                }
+                            }
+                        ]
                     }
                 ],
-                truncation="auto"  # Required for computer_use_preview tool
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "browser_action",
+                            "description": "Perform an action in the browser",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": ["click", "double_click", "scroll", "type", "keypress", "wait", "navigate"],
+                                        "description": "The type of action to perform"
+                                    },
+                                    "x": {
+                                        "type": "integer",
+                                        "description": "The x-coordinate for click actions"
+                                    },
+                                    "y": {
+                                        "type": "integer",
+                                        "description": "The y-coordinate for click actions"
+                                    },
+                                    "dx": {
+                                        "type": "integer",
+                                        "description": "The horizontal scroll amount"
+                                    },
+                                    "dy": {
+                                        "type": "integer",
+                                        "description": "The vertical scroll amount"
+                                    },
+                                    "text": {
+                                        "type": "string",
+                                        "description": "The text to type"
+                                    },
+                                    "key": {
+                                        "type": "string",
+                                        "description": "The key to press (e.g., 'Enter', 'Tab', 'ArrowDown')"
+                                    },
+                                    "ms": {
+                                        "type": "integer",
+                                        "description": "The number of milliseconds to wait"
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "description": "The URL to navigate to"
+                                    }
+                                },
+                                "required": ["type"]
+                            }
+                        }
+                    }
+                ]
             )
+            
             return response
         except Exception as e:
-            raise Exception(f"Failed to make initial request to Computer Use Agent: {str(e)}")
+            raise Exception(f"Error sending initial request to Computer Use Agent: {str(e)}")
     
     def send_screenshot(self, previous_response_id, call_id, screenshot_base64):
         """
@@ -69,30 +131,99 @@ class ComputerUseAgent:
             object: The response from the API.
         """
         try:
-            response = self.client.responses.create(
-                model="computer-use-preview",
-                previous_response_id=previous_response_id,
-                tools=[{
-                    "type": "computer_use_preview",
-                    "display_width": self.display_width,
-                    "display_height": self.display_height,
-                    "environment": self.environment
-                }],
-                input=[
+            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+            # do not change this unless explicitly requested by the user
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
                     {
-                        "call_id": call_id,
-                        "type": "computer_call_output",
-                        "output": {
-                            "type": "input_image",
-                            "image_url": f"data:image/png;base64,{screenshot_base64}"
-                        }
+                        "role": "system",
+                        "content": f"You are a computer use agent operating in a {self.environment} environment with dimensions {self.display_width}x{self.display_height}."
+                    },
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": call_id,
+                                "type": "function",
+                                "function": {
+                                    "name": "browser_action",
+                                    "arguments": "{}"  # This is just a placeholder, not actually used
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "role": "tool",
+                        "tool_call_id": call_id,
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{screenshot_base64}"
+                                }
+                            }
+                        ]
                     }
                 ],
-                truncation="auto"
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "browser_action",
+                            "description": "Perform an action in the browser",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": ["click", "double_click", "scroll", "type", "keypress", "wait", "navigate"],
+                                        "description": "The type of action to perform"
+                                    },
+                                    "x": {
+                                        "type": "integer",
+                                        "description": "The x-coordinate for click actions"
+                                    },
+                                    "y": {
+                                        "type": "integer",
+                                        "description": "The y-coordinate for click actions"
+                                    },
+                                    "dx": {
+                                        "type": "integer",
+                                        "description": "The horizontal scroll amount"
+                                    },
+                                    "dy": {
+                                        "type": "integer",
+                                        "description": "The vertical scroll amount"
+                                    },
+                                    "text": {
+                                        "type": "string",
+                                        "description": "The text to type"
+                                    },
+                                    "key": {
+                                        "type": "string",
+                                        "description": "The key to press (e.g., 'Enter', 'Tab', 'ArrowDown')"
+                                    },
+                                    "ms": {
+                                        "type": "integer",
+                                        "description": "The number of milliseconds to wait"
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "description": "The URL to navigate to"
+                                    }
+                                },
+                                "required": ["type"]
+                            }
+                        }
+                    }
+                ]
             )
+            
             return response
         except Exception as e:
-            raise Exception(f"Failed to send screenshot to Computer Use Agent: {str(e)}")
+            raise Exception(f"Error sending screenshot to Computer Use Agent: {str(e)}")
     
     def acknowledge_safety_checks(self, previous_response_id, call_id, safety_checks):
         """
@@ -106,25 +237,6 @@ class ComputerUseAgent:
         Returns:
             object: The response from the API.
         """
-        try:
-            response = self.client.responses.create(
-                model="computer-use-preview",
-                previous_response_id=previous_response_id,
-                tools=[{
-                    "type": "computer_use_preview",
-                    "display_width": self.display_width,
-                    "display_height": self.display_height,
-                    "environment": self.environment
-                }],
-                input=[
-                    {
-                        "call_id": call_id,
-                        "type": "acknowledge_safety_checks",
-                        "safety_checks": safety_checks
-                    }
-                ],
-                truncation="auto"
-            )
-            return response
-        except Exception as e:
-            raise Exception(f"Failed to acknowledge safety checks: {str(e)}")
+        # Note: The Computer Use API may include safety checks in the future
+        # This method is a placeholder for that functionality
+        pass

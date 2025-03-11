@@ -3,12 +3,14 @@ import base64
 import threading
 import time
 import io
+import uuid
 from PIL import Image
 import os
 
 from browser_automation import BrowserAutomation
 from computer_use_agent import ComputerUseAgent
 from utils import get_screenshot_as_base64
+from session_manager import SessionManager
 
 # Set page configuration
 st.set_page_config(
@@ -33,11 +35,52 @@ if 'stop_agent' not in st.session_state:
     st.session_state.stop_agent = False
 if 'agent_thread' not in st.session_state:
     st.session_state.agent_thread = None
+if 'session_manager' not in st.session_state:
+    st.session_state.session_manager = SessionManager()
+if 'current_session_id' not in st.session_state:
+    st.session_state.current_session_id = None
+
+# Check for session ID in URL query parameters
+query_params = st.experimental_get_query_params()
+if 'session' in query_params:
+    session_id = query_params['session'][0]
+    if st.session_state.current_session_id != session_id:
+        # Load the session data
+        session_data = st.session_state.session_manager.get_session(session_id)
+        if session_data:
+            st.session_state.current_session_id = session_id
+            # Load session configuration
+            if 'browser_config' in session_data:
+                config = session_data['browser_config']
+                st.session_state.environment = config.get('environment', 'browser')
+                st.session_state.display_width = config.get('display_width', 1024)
+                st.session_state.display_height = config.get('display_height', 768)
+                st.session_state.headless = config.get('headless', False)
+                st.session_state.starting_url = config.get('starting_url', 'https://www.google.com')
+            
+            if 'task' in session_data:
+                st.session_state.task = session_data['task']
+                
+            if 'logs' in session_data:
+                # Convert to the format we use in the app
+                st.session_state.logs = [log['message'] for log in session_data['logs']]
+                
+            if 'screenshots' in session_data and session_data['screenshots']:
+                # Get the latest screenshot
+                st.session_state.screenshot = session_data['screenshots'][-1]['data']
 
 def add_log(message):
-    """Add a message to the logs"""
+    """Add a message to the logs and update session data if available"""
     timestamp = time.strftime("%H:%M:%S")
-    st.session_state.logs.append(f"[{timestamp}] {message}")
+    log_msg = f"[{timestamp}] {message}"
+    st.session_state.logs.append(log_msg)
+    
+    # If we have an active session, update the session logs
+    if st.session_state.current_session_id:
+        st.session_state.session_manager.add_log(
+            st.session_state.current_session_id, 
+            log_msg
+        )
     
 def agent_loop():
     """Main loop for the Computer Use Agent"""
@@ -48,6 +91,13 @@ def agent_loop():
         # Take initial screenshot
         screenshot = get_screenshot_as_base64(st.session_state.browser)
         st.session_state.screenshot = screenshot
+        
+        # Update the session with the initial screenshot
+        if st.session_state.current_session_id:
+            st.session_state.session_manager.add_screenshot(
+                st.session_state.current_session_id,
+                screenshot
+            )
         
         # Create initial request to Computer Use Agent
         response = st.session_state.agent.initial_request(
@@ -98,6 +148,13 @@ def agent_loop():
             screenshot = get_screenshot_as_base64(st.session_state.browser)
             st.session_state.screenshot = screenshot
             
+            # Update the session with the new screenshot
+            if st.session_state.current_session_id:
+                st.session_state.session_manager.add_screenshot(
+                    st.session_state.current_session_id,
+                    screenshot
+                )
+            
             # Send the screenshot back to the agent
             response = st.session_state.agent.send_screenshot(
                 response.id,
@@ -125,6 +182,24 @@ def start_agent():
     if not api_key:
         st.error("OpenAI API key is required")
         return
+    
+    # Create a new session
+    browser_config = {
+        "environment": st.session_state.environment,
+        "display_width": st.session_state.display_width,
+        "display_height": st.session_state.display_height,
+        "headless": st.session_state.headless,
+        "starting_url": st.session_state.starting_url
+    }
+    
+    session_id = st.session_state.session_manager.create_session(
+        task=st.session_state.task,
+        environment=st.session_state.environment,
+        browser_config=browser_config
+    )
+    
+    st.session_state.current_session_id = session_id
+    add_log(f"Created new session: {session_id}")
     
     # Initialize browser if not already running
     if not st.session_state.browser:
