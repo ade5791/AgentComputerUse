@@ -87,8 +87,16 @@ class SessionManager:
         if not session_data:
             return False
         
-        timestamp = datetime.now().isoformat()
-        log_entry = {"timestamp": timestamp, "message": message}
+        # Store both ISO format (for precise sorting) and a human-readable time format (for display)
+        now = datetime.now()
+        timestamp_iso = now.isoformat()
+        timestamp_display = now.strftime("%H:%M:%S")
+        
+        log_entry = {
+            "timestamp": timestamp_display,  # For dashboard display
+            "timestamp_iso": timestamp_iso,  # For precise sorting
+            "message": message
+        }
         
         if "logs" not in session_data:
             session_data["logs"] = []
@@ -113,16 +121,24 @@ class SessionManager:
         if not session_data:
             return False
         
-        timestamp = datetime.now().isoformat()
-        screenshot_entry = {"timestamp": timestamp, "data": screenshot_base64}
+        # Store both ISO format (for precise sorting) and a human-readable time format (for display)
+        now = datetime.now()
+        timestamp_iso = now.isoformat()
+        timestamp_display = now.strftime("%H:%M:%S")
+        
+        screenshot_entry = {
+            "timestamp": timestamp_display,  # For dashboard display
+            "timestamp_iso": timestamp_iso,  # For precise sorting
+            "data": screenshot_base64
+        }
         
         if "screenshots" not in session_data:
             session_data["screenshots"] = []
             
-        # Keep only the last 5 screenshots to save space
+        # Increase to store the last 10 screenshots to provide more history for visualization
         session_data["screenshots"].append(screenshot_entry)
-        if len(session_data["screenshots"]) > 5:
-            session_data["screenshots"] = session_data["screenshots"][-5:]
+        if len(session_data["screenshots"]) > 10:
+            session_data["screenshots"] = session_data["screenshots"][-10:]
         
         self._save_session(session_id, session_data)
         return True

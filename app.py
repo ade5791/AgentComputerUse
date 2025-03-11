@@ -54,8 +54,18 @@ if 'pending_safety_call_id' not in st.session_state:
 if 'awaiting_safety_confirmation' not in st.session_state:
     st.session_state.awaiting_safety_confirmation = False
 
-# Check for session ID in URL query parameters
+# Check for query parameters
 query_params = st.query_params
+
+# Check if we should show the dashboard
+if 'show_dashboard' in query_params and query_params['show_dashboard'] == 'true':
+    # Import dashboard functionality
+    import dashboard
+    dashboard.load_dashboard()
+    # Stop further execution of the main app since we're showing the dashboard
+    st.stop()
+
+# Check for session ID in URL query parameters    
 if 'session' in query_params:
     session_id = query_params['session']
     if st.session_state.current_session_id != session_id:
@@ -521,6 +531,31 @@ with st.sidebar:
     stop_button = col2.button("Stop Agent", on_click=stop_agent)
     
     close_button = st.button("Close Browser", on_click=close_browser)
+    
+    # Dashboard link
+    st.header("Analytics")
+    
+    def open_dashboard():
+        """Function to navigate to the dashboard"""
+        # Store current state in session
+        st.session_state.view_dashboard = True
+        # Redirect to dashboard.py
+        import sys
+        import os
+        
+        script_path = os.path.join(os.getcwd(), "dashboard.py")
+        os.environ["STREAMLIT_RUN_TARGET"] = script_path
+        # This will be handled on next rerun
+    
+    if st.button("📊 View Session Dashboard", use_container_width=True, type="primary"):
+        # Create a redirect URL
+        st.markdown("""
+        <meta http-equiv="refresh" content="0;URL='/?show_dashboard=true'" />
+        """, unsafe_allow_html=True)
+    
+    # Session history info
+    session_count = len(st.session_state.session_manager.list_sessions())
+    st.info(f"You have {session_count} stored sessions. View them in the dashboard.")
 
 # Task input
 st.header("Task Description")

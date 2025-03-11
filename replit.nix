@@ -1,5 +1,11 @@
 {pkgs}: {
   deps = [
+    pkgs.glibcLocales
+    pkgs.qhull
+    pkgs.pkg-config
+    pkgs.gobject-introspection
+    pkgs.ghostscript
+    pkgs.ffmpeg-full
     pkgs.mesa
     pkgs.at-spi2-atk
     pkgs.dbus
