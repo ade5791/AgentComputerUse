@@ -116,6 +116,45 @@ def add_log(message):
             log_msg
         )
     
+def extract_reasoning_data(response, action_type=None):
+    """
+    Extract reasoning data from an OpenAI response and save it to the session.
+    
+    Args:
+        response: The OpenAI response object
+        action_type: Optional action type that this reasoning is related to
+        
+    Returns:
+        bool: True if reasoning data was extracted and saved
+    """
+    if not st.session_state.current_session_id:
+        return False
+        
+    # Extract text content from the response
+    text_outputs = [item for item in response.output if item.type == "text"]
+    if not text_outputs:
+        return False
+        
+    # Create reasoning data structure
+    reasoning_content = {
+        "agent_reasoning": text_outputs[0].text,
+        "timestamp": time.time(),
+        "action_performed": action_type,
+        "decision_points": [],
+        "alternatives_considered": []
+    }
+    
+    # Add the reasoning data to the session
+    result = st.session_state.session_manager.add_reasoning_data(
+        st.session_state.current_session_id,
+        reasoning_content
+    )
+    
+    if result:
+        add_log("Captured reasoning data from agent")
+        return True
+    return False
+    
 def agent_loop():
     """Main loop for the Computer Use Agent"""
     try:
@@ -140,6 +179,9 @@ def agent_loop():
         )
         
         add_log(f"Received initial response from agent (ID: {response.id})")
+        
+        # Extract reasoning data using our helper function
+        extract_reasoning_data(response)
         
         # Continue loop until stopped or no more actions
         while not st.session_state.stop_agent:
