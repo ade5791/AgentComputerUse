@@ -9,6 +9,7 @@ import os
 
 # Import the reasoning capture module
 from reasoning_capture import ReasoningCapture, extract_reasoning_data as rc_extract_reasoning_data, capture_after_screenshot
+from reasoning_helper import process_screenshot_response, process_initial_response, process_safety_checks
 
 from browser_automation import BrowserAutomation
 from mock_browser_automation import MockBrowserAutomation
@@ -164,12 +165,8 @@ def agent_loop():
         add_log("Starting Computer Use Agent...")
         st.session_state.stop_agent = False
         
-        # Initialize reasoning capture
-        reasoning_capture = ReasoningCapture(
-            session_manager=st.session_state.session_manager,
-            session_id=st.session_state.current_session_id,
-            add_log_func=add_log
-        )
+        # Initialize reasoning capture system
+        reasoning_capture = create_reasoning_capture()
         
         # Take initial screenshot
         screenshot = get_screenshot_as_base64(st.session_state.browser)
@@ -396,6 +393,14 @@ def close_browser():
         st.session_state.browser.close()
         st.session_state.browser = None
         add_log("Browser closed")
+        
+def create_reasoning_capture():
+    """Create a reasoning capture instance for the current session"""
+    return ReasoningCapture(
+        session_manager=st.session_state.session_manager,
+        session_id=st.session_state.current_session_id,
+        add_log_func=add_log
+    )
         
 def confirm_safety_checks():
     """Acknowledge the pending safety checks and continue the agent execution"""
