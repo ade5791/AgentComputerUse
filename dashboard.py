@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import altair as alt
 
 from session_manager import SessionManager
+import session_replay
 
 def load_dashboard():
     """

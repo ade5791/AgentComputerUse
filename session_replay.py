@@ -136,12 +136,22 @@ def load_session_replay(session_id, session_manager):
         step=1
     )
     
-    # Function to find the action closest to a screenshot
-    def find_action_for_screenshot(screenshot_index):
-        if not actions:
+    # Utility function to parse timestamp to datetime
+    def parse_timestamp(ts):
+        """Convert string timestamp to datetime object"""
+        if not ts:
             return None
             
-        if screenshot_index >= len(screenshots):
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            except (ValueError, TypeError):
+                return None
+        return ts
+    
+    # Function to find the action closest to a screenshot
+    def find_action_for_screenshot(screenshot_index):
+        if not actions or screenshot_index >= len(screenshots):
             return None
             
         screenshot = screenshots[screenshot_index]
@@ -150,21 +160,12 @@ def load_session_replay(session_id, session_manager):
         # Extract timestamp from screenshot data
         if isinstance(screenshot, dict):
             if 'timestamp' in screenshot:
-                screenshot_timestamp = screenshot['timestamp']
+                screenshot_timestamp = parse_timestamp(screenshot['timestamp'])
             elif 'created_at' in screenshot:
-                screenshot_timestamp = screenshot['created_at']
+                screenshot_timestamp = parse_timestamp(screenshot['created_at'])
                 
         if screenshot_timestamp is None:
             return None
-            
-        # Parse timestamps to make them comparable
-        if isinstance(screenshot_timestamp, str):
-            try:
-                # Try to parse ISO format timestamp
-                from datetime import datetime
-                screenshot_timestamp = datetime.fromisoformat(screenshot_timestamp.replace('Z', '+00:00'))
-            except (ValueError, TypeError):
-                pass
         
         # Find the action that happened just before or at the same time as the screenshot
         closest_action = None
@@ -174,25 +175,19 @@ def load_session_replay(session_id, session_manager):
             if not isinstance(action, dict):
                 continue
                 
-            action_timestamp = action.get('timestamp', None)
+            action_timestamp = parse_timestamp(action.get('timestamp', None))
             if action_timestamp is None:
                 continue
-                
-            # Parse action timestamp if it's a string
-            if isinstance(action_timestamp, str):
-                try:
-                    action_timestamp = datetime.fromisoformat(action_timestamp.replace('Z', '+00:00'))
-                except (ValueError, TypeError):
-                    continue
             
             # Calculate time difference
             try:
-                diff = abs((screenshot_timestamp - action_timestamp).total_seconds())
-                
-                # Action should happen before or very close to the screenshot
-                if diff < min_diff:
-                    min_diff = diff
-                    closest_action = action
+                if isinstance(screenshot_timestamp, datetime) and isinstance(action_timestamp, datetime):
+                    diff = abs((screenshot_timestamp - action_timestamp).total_seconds())
+                    
+                    # Action should happen before or very close to the screenshot
+                    if diff < min_diff:
+                        min_diff = diff
+                        closest_action = action
             except (TypeError, AttributeError):
                 continue
                 
@@ -200,10 +195,7 @@ def load_session_replay(session_id, session_manager):
     
     # Function to find reasoning data for a screenshot
     def find_reasoning_for_screenshot(screenshot_index):
-        if not reasoning_data:
-            return None
-            
-        if screenshot_index >= len(screenshots):
+        if not reasoning_data or screenshot_index >= len(screenshots):
             return None
             
         screenshot = screenshots[screenshot_index]
@@ -212,21 +204,12 @@ def load_session_replay(session_id, session_manager):
         # Extract timestamp from screenshot data
         if isinstance(screenshot, dict):
             if 'timestamp' in screenshot:
-                screenshot_timestamp = screenshot['timestamp']
+                screenshot_timestamp = parse_timestamp(screenshot['timestamp'])
             elif 'created_at' in screenshot:
-                screenshot_timestamp = screenshot['created_at']
+                screenshot_timestamp = parse_timestamp(screenshot['created_at'])
                 
         if screenshot_timestamp is None:
             return None
-            
-        # Parse timestamps to make them comparable
-        if isinstance(screenshot_timestamp, str):
-            try:
-                # Try to parse ISO format timestamp
-                from datetime import datetime
-                screenshot_timestamp = datetime.fromisoformat(screenshot_timestamp.replace('Z', '+00:00'))
-            except (ValueError, TypeError):
-                pass
         
         # Find reasoning data that happened close to the screenshot timestamp
         closest_reasoning = None
@@ -236,25 +219,19 @@ def load_session_replay(session_id, session_manager):
             if not isinstance(reasoning, dict):
                 continue
                 
-            reasoning_timestamp = reasoning.get('timestamp', None)
+            reasoning_timestamp = parse_timestamp(reasoning.get('timestamp', None))
             if reasoning_timestamp is None:
                 continue
-                
-            # Parse reasoning timestamp if it's a string
-            if isinstance(reasoning_timestamp, str):
-                try:
-                    reasoning_timestamp = datetime.fromisoformat(reasoning_timestamp.replace('Z', '+00:00'))
-                except (ValueError, TypeError):
-                    continue
             
             # Calculate time difference
             try:
-                diff = abs((screenshot_timestamp - reasoning_timestamp).total_seconds())
-                
-                # Find the closest reasoning data in time
-                if diff < min_diff:
-                    min_diff = diff
-                    closest_reasoning = reasoning
+                if isinstance(screenshot_timestamp, datetime) and isinstance(reasoning_timestamp, datetime):
+                    diff = abs((screenshot_timestamp - reasoning_timestamp).total_seconds())
+                    
+                    # Find the closest reasoning data in time
+                    if diff < min_diff:
+                        min_diff = diff
+                        closest_reasoning = reasoning
             except (TypeError, AttributeError):
                 continue
                 
@@ -342,12 +319,19 @@ def load_session_replay(session_id, session_manager):
     # Calculate session duration if timestamps are available
     if screenshots and len(screenshots) >= 2:
         try:
-            start_time = screenshots[0].get('timestamp', 0)
-            end_time = screenshots[-1].get('timestamp', 0)
-            duration_seconds = end_time - start_time
-            duration_formatted = f"{duration_seconds:.1f}s"
-            col4.metric("Duration", duration_formatted)
-        except (IndexError, KeyError, TypeError):
+            start_time_str = screenshots[0].get('timestamp', None)
+            end_time_str = screenshots[-1].get('timestamp', None)
+            
+            start_time = parse_timestamp(start_time_str)
+            end_time = parse_timestamp(end_time_str)
+            
+            if start_time and end_time and isinstance(start_time, datetime) and isinstance(end_time, datetime):
+                duration_seconds = (end_time - start_time).total_seconds()
+                duration_formatted = f"{duration_seconds:.1f}s"
+                col4.metric("Duration", duration_formatted)
+            else:
+                col4.metric("Duration", "Unknown")
+        except (IndexError, KeyError, TypeError, AttributeError):
             col4.metric("Duration", "Unknown")
     else:
         col4.metric("Duration", "Unknown")
@@ -369,9 +353,6 @@ def load_session_replay(session_id, session_manager):
     # CSV export of actions
     if actions:
         try:
-            import pandas as pd
-            import io
-            
             # Convert actions to DataFrame
             actions_df = pd.DataFrame(actions)
             csv_buffer = io.StringIO()
