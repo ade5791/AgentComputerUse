@@ -41,9 +41,9 @@ if 'current_session_id' not in st.session_state:
     st.session_state.current_session_id = None
 
 # Check for session ID in URL query parameters
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 if 'session' in query_params:
-    session_id = query_params['session'][0]
+    session_id = query_params['session']
     if st.session_state.current_session_id != session_id:
         # Load the session data
         session_data = st.session_state.session_manager.get_session(session_id)
@@ -331,12 +331,51 @@ with col2:
     
     # Display logs in reverse order (newest first)
     logs_text = "\n".join(reversed(st.session_state.logs))
-    logs_placeholder.text_area("", value=logs_text, height=400, key="logs_display")
+    logs_placeholder.text_area("Logs", value=logs_text, height=400, key="logs_display", label_visibility="collapsed")
 
 # Status indicator
 status_text = "Agent is running" if st.session_state.agent_running else "Agent is stopped"
 status_color = "green" if st.session_state.agent_running else "red"
 st.markdown(f"<h4 style='color: {status_color};'>Status: {status_text}</h4>", unsafe_allow_html=True)
+
+# Display session information
+if st.session_state.current_session_id:
+    st.header("Session Information")
+    session_link = st.session_state.session_manager.get_session_link(
+        st.session_state.current_session_id,
+        base_url=f"http://{st.request.host}"
+    )
+    st.markdown(f"**Session ID:** {st.session_state.current_session_id}")
+    st.markdown(f"**Shareable Link:** [Open Session]({session_link})")
+    st.text_input(
+        "Copy Session Link",
+        value=session_link,
+        key="session_link_input",
+        disabled=True
+    )
+
+# Display previous sessions
+st.header("Previous Sessions")
+sessions = st.session_state.session_manager.list_sessions(limit=5)
+if sessions:
+    for session in sessions:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"**{session['task'][:50] + '...' if len(session['task']) > 50 else session['task']}**")
+            st.caption(f"Created: {session['created_at'][:16]} | Environment: {session['environment']} | Status: {session['status']}")
+        with col2:
+            session_link = st.session_state.session_manager.get_session_link(
+                session['id'],
+                base_url=f"http://{st.request.host}"
+            )
+            st.button(
+                "View Session",
+                key=f"view_session_{session['id']}",
+                on_click=lambda s=session_link: st.query_params.update({"session": s})
+            )
+        st.divider()
+else:
+    st.info("No previous sessions found. Start a new session to see it here.")
 
 # Auto-refresh the UI every 2 seconds while the agent is running
 if st.session_state.agent_running:

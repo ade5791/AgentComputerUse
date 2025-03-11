@@ -160,11 +160,8 @@ class SessionManager:
             str: The shareable link.
         """
         if not base_url:
-            # Try to get the current Streamlit URL
-            if hasattr(st, 'experimental_get_query_params'):
-                base_url = st.experimental_get_query_params().get('server_url', ['http://localhost:5000'])[0]
-            else:
-                base_url = "http://localhost:5000"
+            # Default to localhost if no base URL is provided
+            base_url = "http://localhost:5000"
         
         return f"{base_url}?session={session_id}"
     

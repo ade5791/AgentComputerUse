@@ -25,7 +25,7 @@ class ComputerUseAgent:
         
     def initial_request(self, task, screenshot_base64):
         """
-        Send the initial request to the Computer Use Agent.
+        Send the initial request to the Computer Use Agent using the Responses API.
         
         Args:
             task (str): The task to perform.
@@ -35,83 +35,31 @@ class ComputerUseAgent:
             object: The response from the API.
         """
         try:
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-            # do not change this unless explicitly requested by the user
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are a computer use agent operating in a {self.environment} environment with dimensions {self.display_width}x{self.display_height}."
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"Task: {task}"
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{screenshot_base64}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "browser_action",
-                            "description": "Perform an action in the browser",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "type": {
-                                        "type": "string",
-                                        "enum": ["click", "double_click", "scroll", "type", "keypress", "wait", "navigate"],
-                                        "description": "The type of action to perform"
-                                    },
-                                    "x": {
-                                        "type": "integer",
-                                        "description": "The x-coordinate for click actions"
-                                    },
-                                    "y": {
-                                        "type": "integer",
-                                        "description": "The y-coordinate for click actions"
-                                    },
-                                    "dx": {
-                                        "type": "integer",
-                                        "description": "The horizontal scroll amount"
-                                    },
-                                    "dy": {
-                                        "type": "integer",
-                                        "description": "The vertical scroll amount"
-                                    },
-                                    "text": {
-                                        "type": "string",
-                                        "description": "The text to type"
-                                    },
-                                    "key": {
-                                        "type": "string",
-                                        "description": "The key to press (e.g., 'Enter', 'Tab', 'ArrowDown')"
-                                    },
-                                    "ms": {
-                                        "type": "integer",
-                                        "description": "The number of milliseconds to wait"
-                                    },
-                                    "url": {
-                                        "type": "string",
-                                        "description": "The URL to navigate to"
-                                    }
-                                },
-                                "required": ["type"]
-                            }
-                        }
-                    }
-                ]
+            # Using the computer-use-preview model from OpenAI's Responses API
+            input_content = [
+                {
+                    "role": "user",
+                    "content": task
+                }
+            ]
+            
+            # Include screenshot if provided
+            if screenshot_base64:
+                input_content.append({
+                    "type": "input_image",
+                    "image_url": f"data:image/png;base64,{screenshot_base64}"
+                })
+            
+            response = self.client.responses.create(
+                model="computer-use-preview",
+                tools=[{
+                    "type": "computer_use_preview",
+                    "display_width": self.display_width,
+                    "display_height": self.display_height,
+                    "environment": self.environment
+                }],
+                input=input_content,
+                truncation="auto"
             )
             
             return response
@@ -131,94 +79,26 @@ class ComputerUseAgent:
             object: The response from the API.
         """
         try:
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-            # do not change this unless explicitly requested by the user
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
+            response = self.client.responses.create(
+                model="computer-use-preview",
+                previous_response_id=previous_response_id,
+                tools=[{
+                    "type": "computer_use_preview",
+                    "display_width": self.display_width,
+                    "display_height": self.display_height,
+                    "environment": self.environment
+                }],
+                input=[
                     {
-                        "role": "system",
-                        "content": f"You are a computer use agent operating in a {self.environment} environment with dimensions {self.display_width}x{self.display_height}."
-                    },
-                    {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": call_id,
-                                "type": "function",
-                                "function": {
-                                    "name": "browser_action",
-                                    "arguments": "{}"  # This is just a placeholder, not actually used
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "role": "tool",
-                        "tool_call_id": call_id,
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{screenshot_base64}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "browser_action",
-                            "description": "Perform an action in the browser",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "type": {
-                                        "type": "string",
-                                        "enum": ["click", "double_click", "scroll", "type", "keypress", "wait", "navigate"],
-                                        "description": "The type of action to perform"
-                                    },
-                                    "x": {
-                                        "type": "integer",
-                                        "description": "The x-coordinate for click actions"
-                                    },
-                                    "y": {
-                                        "type": "integer",
-                                        "description": "The y-coordinate for click actions"
-                                    },
-                                    "dx": {
-                                        "type": "integer",
-                                        "description": "The horizontal scroll amount"
-                                    },
-                                    "dy": {
-                                        "type": "integer",
-                                        "description": "The vertical scroll amount"
-                                    },
-                                    "text": {
-                                        "type": "string",
-                                        "description": "The text to type"
-                                    },
-                                    "key": {
-                                        "type": "string",
-                                        "description": "The key to press (e.g., 'Enter', 'Tab', 'ArrowDown')"
-                                    },
-                                    "ms": {
-                                        "type": "integer",
-                                        "description": "The number of milliseconds to wait"
-                                    },
-                                    "url": {
-                                        "type": "string",
-                                        "description": "The URL to navigate to"
-                                    }
-                                },
-                                "required": ["type"]
-                            }
+                        "call_id": call_id,
+                        "type": "computer_call_output",
+                        "output": {
+                            "type": "input_image",
+                            "image_url": f"data:image/png;base64,{screenshot_base64}"
                         }
                     }
-                ]
+                ],
+                truncation="auto"
             )
             
             return response
@@ -237,6 +117,30 @@ class ComputerUseAgent:
         Returns:
             object: The response from the API.
         """
-        # Note: The Computer Use API may include safety checks in the future
-        # This method is a placeholder for that functionality
-        pass
+        try:
+            response = self.client.responses.create(
+                model="computer-use-preview",
+                previous_response_id=previous_response_id,
+                tools=[{
+                    "type": "computer_use_preview",
+                    "display_width": self.display_width,
+                    "display_height": self.display_height,
+                    "environment": self.environment
+                }],
+                input=[
+                    {
+                        "type": "computer_call_output",
+                        "call_id": call_id,
+                        "acknowledged_safety_checks": [
+                            {
+                                "id": safety_check["id"]
+                            } for safety_check in safety_checks
+                        ]
+                    }
+                ],
+                truncation="auto"
+            )
+            
+            return response
+        except Exception as e:
+            raise Exception(f"Error acknowledging safety checks: {str(e)}")
