@@ -91,6 +91,119 @@ def add_log(session_id, message):
     
     return log_msg
 
+# Function to continue the agent loop with a response
+def continue_agent_loop_with_response(session_id, response):
+    """Continue agent loop with a response (e.g., after safety check confirmation)"""
+    if session_id not in active_sessions:
+        return
+    
+    session_data = active_sessions[session_id]
+    
+    try:
+        browser = session_data["browser"]
+        agent = session_data["agent"]
+        
+        add_log(session_id, f"Continuing agent loop with response (ID: {response.id})")
+        
+        # Continue loop until stopped or no more actions
+        while not session_data.get("stop_requested", False):
+            # Check if paused
+            if session_data.get("paused", False):
+                time.sleep(1)
+                continue
+                
+            # Find computer_call items in the response
+            computer_calls = [item for item in response.output if item.type == "computer_call"]
+            
+            if not computer_calls:
+                # Check if there's a text output we can log
+                text_outputs = [item for item in response.output if item.type == "text"]
+                if text_outputs:
+                    add_log(session_id, f"Agent message: {text_outputs[0].text}")
+                
+                add_log(session_id, "Task completed. No more actions to perform.")
+                break
+                
+            # Get the computer call
+            computer_call = computer_calls[0]
+            call_id = computer_call.call_id
+            action = computer_call.action
+            
+            # Log the action
+            add_log(session_id, f"Executing action: {action.type} (Call ID: {call_id})")
+            
+            # Check if safety checks need to be acknowledged
+            if hasattr(computer_call, 'pending_safety_checks') and computer_call.pending_safety_checks:
+                safety_checks = computer_call.pending_safety_checks
+                safety_codes = [sc.code for sc in safety_checks]
+                add_log(session_id, f"Safety check required: {safety_codes}")
+                
+                # Store safety checks in session data so they can be displayed to user
+                session_data["pending_safety_checks"] = safety_checks
+                session_data["pending_safety_response_id"] = response.id
+                session_data["pending_safety_call_id"] = call_id
+                session_data["awaiting_safety_confirmation"] = True
+                session_data["paused"] = True  # Pause while waiting for confirmation
+                
+                # Update session status
+                session_manager.update_session(
+                    session_id,
+                    {"status": "awaiting_safety_confirmation", "safety_checks": safety_codes}
+                )
+                
+                add_log(session_id, "Session paused waiting for safety check confirmation")
+                break
+                
+            # Execute the action
+            try:
+                browser.execute_action(action)
+                add_log(session_id, f"Action executed successfully: {action.type}")
+            except Exception as e:
+                add_log(session_id, f"Error executing action: {str(e)}")
+                # If action fails, we still continue with a new screenshot
+            
+            # Wait a moment for the action to take effect
+            time.sleep(1)
+            
+            # Take a new screenshot
+            screenshot = get_screenshot_as_base64(browser)
+            
+            # Update the session with the new screenshot
+            session_manager.add_screenshot(session_id, screenshot)
+            
+            # Send the screenshot back to the agent
+            try:
+                response = agent.send_screenshot(
+                    response.id,
+                    call_id,
+                    screenshot
+                )
+                add_log(session_id, f"Sent screenshot to agent (Response ID: {response.id})")
+            except Exception as e:
+                add_log(session_id, f"Error sending screenshot to agent: {str(e)}")
+                break
+            
+        add_log(session_id, "Agent loop stopped")
+        
+        # Update session status
+        session_manager.update_session(
+            session_id,
+            {"status": "completed" if not session_data.get("stop_requested", False) else "stopped"}
+        )
+        
+        session_data["status"] = "completed" if not session_data.get("stop_requested", False) else "stopped"
+        
+    except Exception as e:
+        error_message = f"Error in agent loop: {str(e)}"
+        add_log(session_id, error_message)
+        # Update session status on error
+        session_manager.update_session(
+            session_id,
+            {"status": "error", "error": str(e)}
+        )
+        session_data["status"] = "error"
+        session_data["error"] = str(e)
+
 # Function to run the agent loop
 def agent_loop(session_id, task_id):
     """Main loop for the Computer Use Agent"""
@@ -340,12 +453,25 @@ async def get_session_status(session_id: str, task_id: str):
     if stored_session.get("screenshots") and len(stored_session["screenshots"]) > 0:
         current_screenshot = stored_session["screenshots"][-1]["data"]
     
+    # Check if there are pending safety checks to include in the response
+    pending_safety_checks = None
+    if session_data.get("awaiting_safety_confirmation", False) and session_data.get("pending_safety_checks"):
+        # Convert safety checks to API response format
+        pending_safety_checks = []
+        for sc in session_data["pending_safety_checks"]:
+            pending_safety_checks.append(SafetyCheck(
+                id=sc.id,
+                code=sc.code,
+                message=sc.message
+            ))
+    
     return StatusResponse(
         session_id=session_id,
         task_id=task_id,
         status=session_data["status"],
         logs=logs,
-        current_screenshot=current_screenshot
+        current_screenshot=current_screenshot,
+        pending_safety_checks=pending_safety_checks
     )
 
 @app.post("/api/sessions/{session_id}/stop", response_model=ApiResponse)
