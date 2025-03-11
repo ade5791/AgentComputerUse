@@ -8,7 +8,7 @@ from PIL import Image
 import os
 
 # Import the reasoning capture module
-from reasoning_capture import extract_reasoning_data as rc_extract_reasoning_data
+from reasoning_capture import extract_reasoning_data as rc_extract_reasoning_data, capture_after_screenshot
 
 from browser_automation import BrowserAutomation
 from mock_browser_automation import MockBrowserAutomation
