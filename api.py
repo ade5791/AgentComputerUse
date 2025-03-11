@@ -52,16 +52,27 @@ class SessionResponse(BaseModel):
     status: str
     session_url: str
 
+class SafetyCheck(BaseModel):
+    id: str
+    code: str
+    message: str
+
 class StatusResponse(BaseModel):
     session_id: str
     task_id: str
     status: str
     logs: List[str]
     current_screenshot: Optional[str] = None
+    pending_safety_checks: Optional[List[SafetyCheck]] = None
 
 class SessionControlRequest(BaseModel):
     session_id: str
     task_id: str
+
+class SafetyCheckConfirmationRequest(BaseModel):
+    session_id: str
+    task_id: str
+    confirm: bool = True
 
 class ApiResponse(BaseModel):
     success: bool
@@ -136,16 +147,24 @@ def agent_loop(session_id, task_id):
             # Check if safety checks need to be acknowledged
             if hasattr(computer_call, 'pending_safety_checks') and computer_call.pending_safety_checks:
                 safety_checks = computer_call.pending_safety_checks
-                add_log(session_id, f"Safety check required: {[sc.code for sc in safety_checks]}")
+                safety_codes = [sc.code for sc in safety_checks]
+                add_log(session_id, f"Safety check required: {safety_codes}")
                 
-                # Here we auto-acknowledge all safety checks for simplicity
-                # In a production system, you might want to ask the user for confirmation
-                response = agent.acknowledge_safety_checks(
-                    response.id, 
-                    call_id,
-                    safety_checks
+                # Store safety checks in session data so they can be displayed to user
+                session_data["pending_safety_checks"] = safety_checks
+                session_data["pending_safety_response_id"] = response.id
+                session_data["pending_safety_call_id"] = call_id
+                session_data["awaiting_safety_confirmation"] = True
+                session_data["paused"] = True  # Pause while waiting for confirmation
+                
+                # Update session status
+                session_manager.update_session(
+                    session_id,
+                    {"status": "awaiting_safety_confirmation", "safety_checks": safety_codes}
                 )
-                continue
+                
+                add_log(session_id, "Session paused waiting for safety check confirmation")
+                break
                 
             # Execute the action
             try:
@@ -404,6 +423,98 @@ async def resume_session(session_id: str, request: SessionControlRequest):
         message="Session resumed",
         data={"session_id": session_id, "status": "running"}
     )
+
+@app.post("/api/sessions/{session_id}/confirm-safety-check", response_model=ApiResponse)
+async def confirm_safety_check(session_id: str, request: SafetyCheckConfirmationRequest, background_tasks: BackgroundTasks):
+    """Confirm or reject safety checks for a session"""
+    # Verify session exists
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get session data
+    session_data = active_sessions[session_id]
+    
+    # Verify task ID
+    if session_data["task_id"] != request.task_id:
+        raise HTTPException(status_code=403, detail="Invalid task ID")
+    
+    # Check if there are pending safety checks
+    if not session_data.get("awaiting_safety_confirmation", False) or not session_data.get("pending_safety_checks"):
+        raise HTTPException(status_code=400, detail="No pending safety checks to confirm")
+    
+    if request.confirm:
+        # User approved safety checks, acknowledge them
+        try:
+            # Get required data for acknowledgment
+            agent = session_data["agent"]
+            response_id = session_data["pending_safety_response_id"]
+            call_id = session_data["pending_safety_call_id"]
+            safety_checks = session_data["pending_safety_checks"]
+            
+            # Acknowledge safety checks
+            add_log(session_id, "User approved safety checks")
+            
+            # Call the OpenAI API to acknowledge safety checks
+            response = agent.acknowledge_safety_checks(
+                response_id,
+                call_id,
+                safety_checks
+            )
+            
+            # Reset safety check flags
+            session_data["awaiting_safety_confirmation"] = False
+            session_data["pending_safety_checks"] = None
+            session_data["pending_safety_response_id"] = None
+            session_data["pending_safety_call_id"] = None
+            session_data["paused"] = False
+            session_data["status"] = "running"
+            
+            # Update session status
+            session_manager.update_session(
+                session_id,
+                {"status": "running"}
+            )
+            
+            # Continue processing in background
+            background_tasks.add_task(continue_agent_loop_with_response, session_id, response)
+            
+            return ApiResponse(
+                success=True,
+                message="Safety checks confirmed, processing continues",
+                data={"session_id": session_id, "status": "running"}
+            )
+        except Exception as e:
+            error_message = f"Error acknowledging safety checks: {str(e)}"
+            add_log(session_id, error_message)
+            
+            return ApiResponse(
+                success=False,
+                message=error_message,
+                data={"session_id": session_id, "status": "error"}
+            )
+    else:
+        # User rejected safety checks, stop the agent
+        add_log(session_id, "User rejected safety checks, stopping agent")
+        
+        # Update session data
+        session_data["awaiting_safety_confirmation"] = False
+        session_data["pending_safety_checks"] = None
+        session_data["pending_safety_response_id"] = None
+        session_data["pending_safety_call_id"] = None
+        session_data["stop_requested"] = True
+        session_data["status"] = "stopped"
+        
+        # Update session status
+        session_manager.update_session(
+            session_id,
+            {"status": "stopped", "reason": "safety_check_rejected"}
+        )
+        
+        return ApiResponse(
+            success=True,
+            message="Safety checks rejected, agent stopped",
+            data={"session_id": session_id, "status": "stopped"}
+        )
 
 @app.post("/api/sessions/{session_id}/cleanup", response_model=ApiResponse)
 async def cleanup_session(session_id: str, request: SessionControlRequest):

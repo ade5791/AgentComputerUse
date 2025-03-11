@@ -39,6 +39,15 @@ if 'session_manager' not in st.session_state:
     st.session_state.session_manager = SessionManager()
 if 'current_session_id' not in st.session_state:
     st.session_state.current_session_id = None
+# Safety check related state variables
+if 'pending_safety_checks' not in st.session_state:
+    st.session_state.pending_safety_checks = None
+if 'pending_safety_response_id' not in st.session_state:
+    st.session_state.pending_safety_response_id = None
+if 'pending_safety_call_id' not in st.session_state:
+    st.session_state.pending_safety_call_id = None
+if 'awaiting_safety_confirmation' not in st.session_state:
+    st.session_state.awaiting_safety_confirmation = False
 
 # Check for session ID in URL query parameters
 query_params = st.query_params
@@ -132,16 +141,20 @@ def agent_loop():
             # Check if safety checks need to be acknowledged
             if hasattr(computer_call, 'pending_safety_checks') and computer_call.pending_safety_checks:
                 safety_checks = computer_call.pending_safety_checks
-                add_log(f"Safety check required: {[sc.code for sc in safety_checks]}")
                 
-                # Here we auto-acknowledge all safety checks for simplicity
-                # In a production system, you might want to ask the user for confirmation
-                response = st.session_state.agent.acknowledge_safety_checks(
-                    response.id, 
-                    call_id,
-                    safety_checks
-                )
-                continue
+                # Log the safety checks
+                safety_codes = [sc.code for sc in safety_checks]
+                safety_messages = [sc.message for sc in safety_checks]
+                add_log(f"Safety check required: {safety_codes}")
+                
+                # Store safety check details in session state for user confirmation
+                st.session_state.pending_safety_checks = safety_checks
+                st.session_state.pending_safety_response_id = response.id
+                st.session_state.pending_safety_call_id = call_id
+                st.session_state.awaiting_safety_confirmation = True
+                
+                # We'll let the agent loop exit and show confirmation UI to the user
+                break
                 
             # Execute the action
             try:
@@ -272,6 +285,155 @@ def close_browser():
         st.session_state.browser.close()
         st.session_state.browser = None
         add_log("Browser closed")
+        
+def confirm_safety_checks():
+    """Acknowledge the pending safety checks and continue the agent execution"""
+    if not st.session_state.pending_safety_checks:
+        return
+    
+    try:
+        # Acknowledge the safety checks
+        response = st.session_state.agent.acknowledge_safety_checks(
+            st.session_state.pending_safety_response_id,
+            st.session_state.pending_safety_call_id,
+            st.session_state.pending_safety_checks
+        )
+        
+        add_log("Safety checks acknowledged by user. Continuing task execution.")
+        
+        # Reset safety check state
+        st.session_state.awaiting_safety_confirmation = False
+        st.session_state.pending_safety_checks = None
+        st.session_state.pending_safety_response_id = None
+        st.session_state.pending_safety_call_id = None
+        
+        # Continue agent execution
+        st.session_state.agent_running = True
+        st.session_state.agent_thread = threading.Thread(target=lambda: agent_loop_with_response(response))
+        st.session_state.agent_thread.daemon = True
+        st.session_state.agent_thread.start()
+    except Exception as e:
+        add_log(f"Error acknowledging safety checks: {str(e)}")
+        st.error(f"Error acknowledging safety checks: {str(e)}")
+        
+def reject_safety_checks():
+    """Reject the pending safety checks and stop the agent execution"""
+    add_log("Safety checks rejected by user. Stopping task execution.")
+    
+    # Reset safety check state
+    st.session_state.awaiting_safety_confirmation = False
+    st.session_state.pending_safety_checks = None
+    st.session_state.pending_safety_response_id = None
+    st.session_state.pending_safety_call_id = None
+    
+    # Update session status
+    if st.session_state.current_session_id:
+        st.session_state.session_manager.update_session(
+            st.session_state.current_session_id,
+            {"status": "stopped", "reason": "safety_check_rejected"}
+        )
+        
+def agent_loop_with_response(initial_response):
+    """Agent loop that starts with an initial response"""
+    try:
+        add_log("Continuing agent execution after safety check confirmation...")
+        st.session_state.stop_agent = False
+        
+        response = initial_response
+        add_log(f"Continuing with response (ID: {response.id})")
+        
+        # Continue loop until stopped or no more actions
+        while not st.session_state.stop_agent:
+            # Find computer_call items in the response
+            computer_calls = [item for item in response.output if item.type == "computer_call"]
+            
+            if not computer_calls:
+                # Check if there's a text output we can log
+                text_outputs = [item for item in response.output if item.type == "text"]
+                if text_outputs:
+                    add_log(f"Agent message: {text_outputs[0].text}")
+                
+                add_log("Task completed. No more actions to perform.")
+                break
+                
+            # Get the computer call
+            computer_call = computer_calls[0]
+            call_id = computer_call.call_id
+            action = computer_call.action
+            
+            # Log the action
+            add_log(f"Executing action: {action.type} (Call ID: {call_id})")
+            
+            # Check if safety checks need to be acknowledged
+            if hasattr(computer_call, 'pending_safety_checks') and computer_call.pending_safety_checks:
+                safety_checks = computer_call.pending_safety_checks
+                
+                # Log the safety checks
+                safety_codes = [sc.code for sc in safety_checks]
+                safety_messages = [sc.message for sc in safety_checks]
+                add_log(f"Safety check required: {safety_codes}")
+                
+                # Store safety check details in session state for user confirmation
+                st.session_state.pending_safety_checks = safety_checks
+                st.session_state.pending_safety_response_id = response.id
+                st.session_state.pending_safety_call_id = call_id
+                st.session_state.awaiting_safety_confirmation = True
+                
+                # We'll let the agent loop exit and show confirmation UI to the user
+                break
+                
+            # Execute the action
+            try:
+                st.session_state.browser.execute_action(action)
+                add_log(f"Action executed successfully: {action.type}")
+            except Exception as e:
+                add_log(f"Error executing action: {str(e)}")
+                # If action fails, we still continue with a new screenshot
+            
+            # Wait a moment for the action to take effect
+            time.sleep(1)
+            
+            # Take a new screenshot
+            screenshot = get_screenshot_as_base64(st.session_state.browser)
+            st.session_state.screenshot = screenshot
+            
+            # Update the session with the new screenshot
+            if st.session_state.current_session_id:
+                st.session_state.session_manager.add_screenshot(
+                    st.session_state.current_session_id,
+                    screenshot
+                )
+            
+            # Send the screenshot back to the agent
+            try:
+                response = st.session_state.agent.send_screenshot(
+                    response.id,
+                    call_id,
+                    screenshot
+                )
+                add_log(f"Sent screenshot to agent (Response ID: {response.id})")
+            except Exception as e:
+                add_log(f"Error sending screenshot to agent: {str(e)}")
+                break
+            
+        add_log("Agent loop stopped")
+        
+        # Update session status
+        if st.session_state.current_session_id:
+            st.session_state.session_manager.update_session(
+                st.session_state.current_session_id,
+                {"status": "completed"}
+            )
+    except Exception as e:
+        add_log(f"Error in agent loop: {str(e)}")
+        # Update session status on error
+        if st.session_state.current_session_id:
+            st.session_state.session_manager.update_session(
+                st.session_state.current_session_id,
+                {"status": "error", "error": str(e)}
+            )
+    finally:
+        st.session_state.agent_running = False
 
 # Main UI
 st.title("🤖 Computer Use Agent")
@@ -362,9 +524,42 @@ with col2:
     logs_placeholder.text_area("Logs", value=logs_text, height=400, key="logs_display", label_visibility="collapsed")
 
 # Status indicator
-status_text = "Agent is running" if st.session_state.agent_running else "Agent is stopped"
-status_color = "green" if st.session_state.agent_running else "red"
+if st.session_state.awaiting_safety_confirmation:
+    status_text = "Agent paused - Safety check required"
+    status_color = "orange"
+else:
+    status_text = "Agent is running" if st.session_state.agent_running else "Agent is stopped"
+    status_color = "green" if st.session_state.agent_running else "red"
 st.markdown(f"<h4 style='color: {status_color};'>Status: {status_text}</h4>", unsafe_allow_html=True)
+
+# Safety check confirmation UI
+if st.session_state.awaiting_safety_confirmation and st.session_state.pending_safety_checks:
+    st.warning("⚠️ Safety Check Required")
+    
+    # Display safety check details
+    st.subheader("The agent encountered a safety check")
+    st.markdown("OpenAI's Computer Use Agent has detected a potential safety issue that requires your approval to continue.")
+    
+    for safety_check in st.session_state.pending_safety_checks:
+        st.markdown(f"**Safety Check Type:** {safety_check.code}")
+        st.markdown(f"**Message:** {safety_check.message}")
+    
+    st.markdown("""
+    ### What does this mean?
+    
+    - **Malicious Instructions:** The agent detected instructions that may cause unauthorized actions
+    - **Irrelevant Domain:** The current website may not be relevant to your task
+    - **Sensitive Domain:** You're on a website that may contain sensitive information
+    
+    Review the current screenshot carefully to verify the agent's actions.
+    """)
+    
+    # Confirmation buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        st.button("✅ Approve and Continue", on_click=confirm_safety_checks, type="primary")
+    with col2:
+        st.button("❌ Reject and Stop", on_click=reject_safety_checks, type="secondary")
 
 # Display session information
 if st.session_state.current_session_id:
