@@ -50,12 +50,35 @@ class TaskRequest(BaseModel):
     headless: bool = True
     starting_url: str = "https://www.google.com"
     api_key: Optional[str] = None
+    user_id: Optional[str] = None
+    session_name: Optional[str] = None
+    tags: Optional[List[str]] = None
+    priority: str = "normal"
+    timeout_seconds: Optional[int] = None
+    max_actions: Optional[int] = None
 
 class SessionResponse(BaseModel):
     session_id: str
     task_id: str
     status: str
     session_url: str
+    name: Optional[str] = None
+    created_at: Optional[str] = None
+
+class SessionListRequest(BaseModel):
+    limit: int = 50
+    filter_by: Optional[Dict[str, Any]] = None
+    sort_field: str = "created_at"
+    sort_direction: str = "desc"
+    user_id: Optional[str] = None
+    tags: Optional[List[str]] = None
+    status: Optional[str] = None
+    
+class SessionUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    tags: Optional[List[str]] = None
+    priority: Optional[str] = None
+    user_id: Optional[str] = None
 
 class SafetyCheck(BaseModel):
     id: str
