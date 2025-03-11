@@ -7,6 +7,9 @@ import uuid
 from PIL import Image
 import os
 
+# Import the reasoning capture module
+from reasoning_capture import extract_reasoning_data as rc_extract_reasoning_data
+
 from browser_automation import BrowserAutomation
 from mock_browser_automation import MockBrowserAutomation
 from computer_use_agent import ComputerUseAgent
