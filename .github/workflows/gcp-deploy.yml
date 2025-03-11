@@ -1,0 +1,44 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+      
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker
+      
+      - name: Build and push Docker image
+        run: |
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/browser-automation-app .
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/browser-automation-app
+      
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy browser-automation-app \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/browser-automation-app \
+            --platform managed \
+            --region us-central1 \
+            --memory 2Gi \
+            --cpu 1 \
+            --port 5000 \
+            --allow-unauthenticated \
+            --set-env-vars PRODUCTION=true \
+            --set-secrets OPENAI_API_KEY=openai-api-key:latest
