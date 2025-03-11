@@ -15,6 +15,7 @@ from computer_use_agent import ComputerUseAgent
 from utils import get_screenshot_as_base64
 from session_manager import SessionManager
 from setup_app import check_install_dependencies, get_browser_environment
+from reasoning_capture import ReasoningCapture, capture_after_screenshot
 
 # Check and install dependencies when API starts
 check_install_dependencies()

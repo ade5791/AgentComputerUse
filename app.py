@@ -8,7 +8,7 @@ from PIL import Image
 import os
 
 # Import the reasoning capture module
-from reasoning_capture import extract_reasoning_data as rc_extract_reasoning_data, capture_after_screenshot
+from reasoning_capture import ReasoningCapture, extract_reasoning_data as rc_extract_reasoning_data, capture_after_screenshot
 
 from browser_automation import BrowserAutomation
 from mock_browser_automation import MockBrowserAutomation
@@ -164,6 +164,13 @@ def agent_loop():
         add_log("Starting Computer Use Agent...")
         st.session_state.stop_agent = False
         
+        # Initialize reasoning capture
+        reasoning_capture = ReasoningCapture(
+            session_manager=st.session_state.session_manager,
+            session_id=st.session_state.current_session_id,
+            add_log_func=add_log
+        )
+        
         # Take initial screenshot
         screenshot = get_screenshot_as_base64(st.session_state.browser)
         st.session_state.screenshot = screenshot
@@ -183,8 +190,8 @@ def agent_loop():
         
         add_log(f"Received initial response from agent (ID: {response.id})")
         
-        # Extract reasoning data using our helper function
-        extract_reasoning_data(response)
+        # Capture reasoning data for initial response
+        reasoning_capture.capture_initial_reasoning(response)
         
         # Continue loop until stopped or no more actions
         while not st.session_state.stop_agent:
