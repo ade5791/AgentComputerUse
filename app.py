@@ -488,58 +488,43 @@ def agent_loop_with_response(initial_response):
     finally:
         st.session_state.agent_running = False
 
-# Initialize theme in session state if it doesn't exist
-if 'theme' not in st.session_state:
-    st.session_state.theme = 'light'  # Default to light theme
-
-# Function to toggle theme
-def toggle_theme():
-    st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
-    st.rerun()
-
-# Create CSS for light/dark themes
-light_theme = """
+# Add CSS to match the OpenAI Computer Use interface style
+st.markdown("""
 <style>
-    /* Light Theme */
-    .main-container {
-        background-color: #ffffff;
-        color: #202123;
+    /* Main container styling */
+    .main {
+        background-color: white;
+        padding: 0 !important;
     }
     
-    .sidebar {
+    /* Sidebar styling */
+    .css-1d391kg {
         background-color: #f7f7f8;
         border-right: 1px solid #e5e5e5;
     }
     
     /* Header styling */
     .stApp header {
-        background-color: #ffffff;
+        background-color: white;
         border-bottom: 1px solid #e5e5e5;
     }
     
     /* Input field styling */
     .stTextArea textarea {
-        border-radius: 12px;
+        border-radius: 8px;
         border: 1px solid #e5e5e5;
         background-color: #ffffff;
-        padding: 12px;
+        padding: 10px;
         font-size: 16px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     }
     
     /* Button styling */
     .stButton > button {
-        border-radius: 8px;
-        padding: 8px 16px;
+        border-radius: 6px;
+        padding: 6px 12px;
         font-size: 14px;
         border: 1px solid #e5e5e5;
         background-color: #f7f7f8;
-        transition: all 0.2s ease;
-    }
-    
-    .stButton > button:hover {
-        background-color: #e5e5e5;
-        transform: translateY(-1px);
     }
     
     /* Primary button styling */
@@ -549,33 +534,26 @@ light_theme = """
         border: none;
     }
     
-    .stButton > button[data-baseweb="button"]:first-child:hover {
-        background-color: #0d926f;
-    }
-    
     /* Recent prompts styling */
     .recent-item {
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-bottom: 10px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 8px;
         background-color: #f7f7f8;
         cursor: pointer;
         font-size: 14px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
     
     .recent-item:hover {
         background-color: #e5e5e5;
-        transform: translateY(-1px);
     }
     
     /* Task response area */
     .task-response {
-        border-radius: 12px;
+        border-radius: 8px;
         border: 1px solid #e5e5e5;
         padding: 15px;
         margin-top: 15px;
@@ -591,11 +569,10 @@ light_theme = """
     
     /* Main title */
     .main-title {
-        font-size: 36px;
+        font-size: 32px;
         font-weight: 600;
         text-align: center;
         margin-bottom: 10px;
-        color: #202123;
     }
     
     /* Subtitle */
@@ -617,17 +594,16 @@ light_theme = """
     /* Browser view container */
     .browser-container {
         border: 1px solid #e5e5e5;
-        border-radius: 12px;
+        border-radius: 8px;
         overflow: hidden;
         margin-top: 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
     
     /* Bottom task bar */
     .task-bar {
         background-color: #f7f7f8;
         border-top: 1px solid #e5e5e5;
-        padding: 12px 18px;
+        padding: 10px 15px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -636,328 +612,19 @@ light_theme = """
     /* Example buttons */
     .example-button {
         display: inline-block;
-        padding: 8px 14px;
-        margin-right: 12px;
-        margin-bottom: 8px;
+        padding: 8px 12px;
+        margin-right: 10px;
         background-color: #f7f7f8;
         border: 1px solid #e5e5e5;
-        border-radius: 8px;
+        border-radius: 6px;
         font-size: 14px;
         cursor: pointer;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
     
     .example-button:hover {
         background-color: #e5e5e5;
-        transform: translateY(-1px);
-    }
-    
-    /* Theme toggle button */
-    .theme-toggle {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-        background-color: #f0f0f0;
-        border-radius: 20px;
-        padding: 4px;
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        z-index: 1000;
-        border: 1px solid #e0e0e0;
-    }
-    
-    .theme-icon {
-        padding: 4px 8px;
-        font-size: 14px;
-    }
-    
-    /* Custom expander styling */
-    .streamlit-expanderHeader {
-        font-size: 14px;
-        font-weight: normal;
-        color: #6e6e80;
-    }
-    
-    /* Hide Streamlit branding */
-    #MainMenu, footer, header {display: none !important;}
-    
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: #c5c5c5;
-        border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #a0a0a0;
     }
 </style>
-"""
-
-dark_theme = """
-<style>
-    /* Dark Theme */
-    body {
-        background-color: #1a1a1a !important;
-        color: #e5e5e5 !important;
-    }
-    
-    .main {
-        background-color: #1a1a1a !important;
-        color: #e5e5e5 !important;
-    }
-    
-    .main-container {
-        background-color: #1a1a1a;
-        color: #e5e5e5;
-    }
-    
-    .sidebar {
-        background-color: #2a2a2a !important;
-        border-right: 1px solid #383838;
-    }
-    
-    /* Header styling */
-    .stApp header {
-        background-color: #1a1a1a !important;
-        border-bottom: 1px solid #383838;
-    }
-    
-    /* Input field styling */
-    .stTextArea textarea {
-        border-radius: 12px;
-        border: 1px solid #383838;
-        background-color: #2a2a2a !important;
-        color: #e5e5e5 !important;
-        padding: 12px;
-        font-size: 16px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        border-radius: 8px;
-        padding: 8px 16px;
-        font-size: 14px;
-        border: 1px solid #383838;
-        background-color: #2a2a2a !important;
-        color: #e5e5e5 !important;
-        transition: all 0.2s ease;
-    }
-    
-    .stButton > button:hover {
-        background-color: #383838 !important;
-        transform: translateY(-1px);
-    }
-    
-    /* Primary button styling */
-    .stButton > button[data-baseweb="button"]:first-child {
-        background-color: #10a37f !important;
-        color: white !important;
-        border: none;
-    }
-    
-    .stButton > button[data-baseweb="button"]:first-child:hover {
-        background-color: #0d926f !important;
-    }
-    
-    /* Recent prompts styling */
-    .recent-item {
-        padding: 10px 14px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        background-color: #2a2a2a;
-        color: #e5e5e5;
-        cursor: pointer;
-        font-size: 14px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    }
-    
-    .recent-item:hover {
-        background-color: #383838;
-        transform: translateY(-1px);
-    }
-    
-    /* Task response area */
-    .task-response {
-        border-radius: 12px;
-        border: 1px solid #383838;
-        padding: 15px;
-        margin-top: 15px;
-        background-color: #2a2a2a;
-    }
-    
-    /* Center content block */
-    .center-col {
-        max-width: 800px;
-        margin: 0 auto;
-        padding-top: 60px;
-    }
-    
-    /* Main title */
-    .main-title {
-        font-size: 36px;
-        font-weight: 600;
-        text-align: center;
-        margin-bottom: 10px;
-        color: #e5e5e5;
-    }
-    
-    /* Subtitle */
-    .subtitle {
-        font-size: 16px;
-        text-align: center;
-        color: #a0a0a0;
-        margin-bottom: 30px;
-    }
-    
-    /* Recent prompt label */
-    .recent-label {
-        font-size: 14px;
-        font-weight: 600;
-        color: #a0a0a0;
-        margin-bottom: 10px;
-    }
-    
-    /* Browser view container */
-    .browser-container {
-        border: 1px solid #383838;
-        border-radius: 12px;
-        overflow: hidden;
-        margin-top: 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-    
-    /* Bottom task bar */
-    .task-bar {
-        background-color: #2a2a2a;
-        border-top: 1px solid #383838;
-        padding: 12px 18px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    
-    /* Example buttons */
-    .example-button {
-        display: inline-block;
-        padding: 8px 14px;
-        margin-right: 12px;
-        margin-bottom: 8px;
-        background-color: #2a2a2a;
-        border: 1px solid #383838;
-        border-radius: 8px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-        color: #e5e5e5;
-    }
-    
-    .example-button:hover {
-        background-color: #383838;
-        transform: translateY(-1px);
-    }
-    
-    /* Theme toggle button */
-    .theme-toggle {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-        background-color: #2a2a2a;
-        border-radius: 20px;
-        padding: 4px;
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        z-index: 1000;
-        border: 1px solid #383838;
-    }
-    
-    .theme-icon {
-        padding: 4px 8px;
-        font-size: 14px;
-    }
-    
-    /* Custom expander styling */
-    .streamlit-expanderHeader {
-        font-size: 14px;
-        font-weight: normal;
-        color: #a0a0a0;
-    }
-    
-    /* Hide Streamlit branding */
-    #MainMenu, footer, header {display: none !important;}
-    
-    /* Override default text color */
-    p, h1, h2, h3, h4, h5, h6, .stMarkdown, .stText {
-        color: #e5e5e5 !important;
-    }
-    
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: #2a2a2a;
-        border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: #555555;
-        border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #666666;
-    }
-</style>
-"""
-
-# Apply the selected theme
-if st.session_state.theme == 'light':
-    st.markdown(light_theme, unsafe_allow_html=True)
-else:
-    st.markdown(dark_theme, unsafe_allow_html=True)
-
-# Define navigation functions
-def open_dashboard():
-    """Function to navigate to the dashboard"""
-    # Store current state in session
-    st.session_state.view_dashboard = True
-    # Set query params to show dashboard
-    st.query_params["show_dashboard"] = "true"
-
-def open_api_docs():
-    """Function to navigate to the API documentation"""
-    # Store current state in session
-    st.session_state.view_api_docs = True
-    # Set query params to show API docs
-    st.query_params["show_api_docs"] = "true"
-
-# Add theme toggle icon
-theme_icon = "🌙" if st.session_state.theme == 'light' else "☀️"
-st.markdown(f"""
-<div class="theme-toggle" onclick="window.parent.postMessage({{topic: 'streamlit:runScript', payload: 'toggle_theme()'}}, '*')">
-    <span class="theme-icon">{theme_icon}</span>
-</div>
 """, unsafe_allow_html=True)
 
 # Sidebar with recent tasks and history
@@ -1003,6 +670,20 @@ with st.sidebar:
 main_col1, main_col2, main_col3 = st.columns([1, 3, 1])
 
 with main_col2:
+    # Store functions for navigation
+    def open_dashboard():
+        """Function to navigate to the dashboard"""
+        # Store current state in session
+        st.session_state.view_dashboard = True
+        # Set query params to show dashboard
+        st.query_params["show_dashboard"] = "true"
+    
+    def open_api_docs():
+        """Function to navigate to the API documentation"""
+        # Store current state in session
+        st.session_state.view_api_docs = True
+        # Set query params to show API docs
+        st.query_params["show_api_docs"] = "true"
 
     # Check if we are in a session or showing the main input screen
     if st.session_state.current_session_id and st.session_state.screenshot:
