@@ -741,13 +741,166 @@ async def cleanup_session(session_id: str, request: SessionControlRequest):
         data={"session_id": session_id, "status": "cleaned"}
     )
 
+@app.get("/api/sessions", response_model=ApiResponse)
+async def list_sessions(
+    limit: int = 50,
+    sort_field: str = "created_at",
+    sort_direction: str = "desc",
+    user_id: Optional[str] = None,
+    status: Optional[str] = None,
+    tag: Optional[str] = None
+):
+    """List all sessions with filtering options"""
+    tags = [tag] if tag else None
+    
+    sessions = session_manager.list_sessions(
+        limit=limit,
+        sort_field=sort_field,
+        sort_direction=sort_direction,
+        user_id=user_id,
+        tags=tags,
+        status=status
+    )
+    
+    return ApiResponse(
+        success=True,
+        message=f"Retrieved {len(sessions)} sessions",
+        data={"sessions": sessions}
+    )
+
+@app.post("/api/sessions/batch", response_model=ApiResponse)
+async def list_sessions_with_filters(request: SessionListRequest):
+    """List sessions with advanced filtering options"""
+    sessions = session_manager.list_sessions(
+        limit=request.limit,
+        filter_by=request.filter_by,
+        sort_field=request.sort_field,
+        sort_direction=request.sort_direction,
+        user_id=request.user_id,
+        tags=request.tags,
+        status=request.status
+    )
+    
+    return ApiResponse(
+        success=True,
+        message=f"Retrieved {len(sessions)} sessions",
+        data={"sessions": sessions}
+    )
+
+@app.get("/api/sessions/active", response_model=ApiResponse)
+async def get_active_sessions():
+    """Get all currently active sessions"""
+    active_count = session_manager.get_active_sessions_count()
+    active_sessions_list = []
+    
+    for session_id, thread_info in session_manager.active_threads.items():
+        if thread_info["thread"].is_alive():
+            session_data = session_manager.get_session(session_id)
+            if session_data:
+                active_sessions_list.append({
+                    "id": session_id,
+                    "task_id": thread_info.get("task_id"),
+                    "started_at": thread_info.get("started_at"),
+                    "status": session_data.get("status", "running"),
+                    "name": session_data.get("name", f"Session {session_id[:8]}"),
+                    "task": session_data.get("task", "")
+                })
+    
+    return ApiResponse(
+        success=True,
+        message=f"Found {active_count} active sessions",
+        data={"active_sessions": active_sessions_list}
+    )
+
+@app.get("/api/sessions/{session_id}/details", response_model=ApiResponse)
+async def get_session_details(session_id: str):
+    """Get detailed information about a specific session"""
+    session_data = session_manager.get_session(session_id)
+    
+    if not session_data:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    
+    # Check if session has an active thread
+    is_active = session_manager.is_session_active(session_id)
+    
+    # Get the latest screenshot if available
+    latest_screenshot = None
+    if "screenshots" in session_data and session_data["screenshots"]:
+        latest_screenshot = session_data["screenshots"][-1]["data"]
+    
+    result = {
+        "session": session_data,
+        "is_active": is_active,
+        "latest_screenshot": latest_screenshot,
+        "logs_count": len(session_data.get("logs", [])),
+        "screenshots_count": len(session_data.get("screenshots", []))
+    }
+    
+    return ApiResponse(
+        success=True,
+        message=f"Retrieved details for session {session_id}",
+        data=result
+    )
+
+@app.put("/api/sessions/{session_id}", response_model=ApiResponse)
+async def update_session_details(session_id: str, request: SessionUpdateRequest):
+    """Update session metadata"""
+    session_data = session_manager.get_session(session_id)
+    
+    if not session_data:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    
+    # Build updates dictionary with only provided fields
+    updates = {}
+    if request.name is not None:
+        updates["name"] = request.name
+    if request.tags is not None:
+        updates["tags"] = request.tags
+    if request.priority is not None:
+        updates["priority"] = request.priority
+    if request.user_id is not None:
+        updates["user_id"] = request.user_id
+    
+    # Update the session
+    success = session_manager.update_session(session_id, updates)
+    
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to update session {session_id}")
+    
+    return ApiResponse(
+        success=True,
+        message=f"Session {session_id} updated successfully",
+        data={"session_id": session_id, "updates": updates}
+    )
+
+@app.post("/api/sessions/cleanup", response_model=ApiResponse)
+async def cleanup_old_sessions(days_old: int = 7):
+    """Clean up sessions older than specified days"""
+    if days_old < 1:
+        raise HTTPException(status_code=400, detail="Days parameter must be at least 1")
+    
+    cleaned_count = session_manager.cleanup_old_sessions(days_old=days_old)
+    
+    return ApiResponse(
+        success=True,
+        message=f"Cleaned up {cleaned_count} sessions older than {days_old} days",
+        data={"cleaned_count": cleaned_count}
+    )
+
 @app.get("/api/health", response_model=ApiResponse)
 async def health_check():
     """Health check endpoint"""
+    active_count = session_manager.get_active_sessions_count()
+    
     return ApiResponse(
         success=True,
         message="API is healthy",
-        data={"status": "ok", "active_sessions": len(active_sessions)}
+        data={
+            "status": "ok", 
+            "active_sessions": active_count,
+            "version": "1.0.0",
+            "browser_environment": get_browser_environment()
+        }
     )
 
 # Run API server when this file is executed directly
