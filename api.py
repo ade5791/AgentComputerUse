@@ -13,6 +13,10 @@ from browser_automation import BrowserAutomation
 from computer_use_agent import ComputerUseAgent
 from utils import get_screenshot_as_base64
 from session_manager import SessionManager
+from setup_app import check_install_dependencies
+
+# Check and install dependencies when API starts
+check_install_dependencies()
 
 # Initialize FastAPI app
 app = FastAPI(

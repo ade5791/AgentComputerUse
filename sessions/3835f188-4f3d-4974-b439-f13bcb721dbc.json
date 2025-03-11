@@ -1,0 +1,21 @@
+{
+  "id": "3835f188-4f3d-4974-b439-f13bcb721dbc",
+  "created_at": "2025-03-11T19:46:54.628932",
+  "task": "search google for open api new",
+  "environment": "browser",
+  "browser_config": {
+    "environment": "browser",
+    "display_width": 1024,
+    "display_height": 768,
+    "headless": true,
+    "starting_url": "https://www.google.com"
+  },
+  "status": "created",
+  "logs": [
+    {
+      "timestamp": "2025-03-11T19:46:54.630990",
+      "message": "[19:46:54] Created new session: 3835f188-4f3d-4974-b439-f13bcb721dbc"
+    }
+  ],
+  "screenshots": []
+}

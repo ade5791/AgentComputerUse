@@ -31,13 +31,13 @@ def check_install_dependencies():
         playwright_cache = os.path.expanduser("~/.cache/ms-playwright")
         if not os.path.exists(playwright_cache) or not os.listdir(playwright_cache):
             print("Installing Playwright browsers...")
-            subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+            subprocess.check_call([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"])
             print("✅ Playwright browsers have been installed")
         else:
             print("✅ Playwright browsers are already installed")
     except Exception as e:
         print(f"❌ Failed to install Playwright browsers: {e}")
-        print("Please run 'python -m playwright install chromium' manually")
+        print("Please run 'python -m playwright install --with-deps chromium' manually")
 
 if __name__ == "__main__":
     check_install_dependencies()
