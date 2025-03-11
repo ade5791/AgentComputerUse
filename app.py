@@ -105,11 +105,19 @@ def agent_loop():
             screenshot
         )
         
+        add_log(f"Received initial response from agent (ID: {response.id})")
+        
         # Continue loop until stopped or no more actions
         while not st.session_state.stop_agent:
+            # Find computer_call items in the response
             computer_calls = [item for item in response.output if item.type == "computer_call"]
             
             if not computer_calls:
+                # Check if there's a text output we can log
+                text_outputs = [item for item in response.output if item.type == "text"]
+                if text_outputs:
+                    add_log(f"Agent message: {text_outputs[0].text}")
+                
                 add_log("Task completed. No more actions to perform.")
                 break
                 
@@ -119,17 +127,19 @@ def agent_loop():
             action = computer_call.action
             
             # Log the action
-            add_log(f"Executing action: {action.type}")
+            add_log(f"Executing action: {action.type} (Call ID: {call_id})")
             
             # Check if safety checks need to be acknowledged
             if hasattr(computer_call, 'pending_safety_checks') and computer_call.pending_safety_checks:
-                add_log(f"Safety check required: {computer_call.pending_safety_checks}")
+                safety_checks = computer_call.pending_safety_checks
+                add_log(f"Safety check required: {[sc.code for sc in safety_checks]}")
+                
                 # Here we auto-acknowledge all safety checks for simplicity
                 # In a production system, you might want to ask the user for confirmation
                 response = st.session_state.agent.acknowledge_safety_checks(
                     response.id, 
                     call_id,
-                    computer_call.pending_safety_checks
+                    safety_checks
                 )
                 continue
                 
@@ -156,15 +166,33 @@ def agent_loop():
                 )
             
             # Send the screenshot back to the agent
-            response = st.session_state.agent.send_screenshot(
-                response.id,
-                call_id,
-                screenshot
-            )
+            try:
+                response = st.session_state.agent.send_screenshot(
+                    response.id,
+                    call_id,
+                    screenshot
+                )
+                add_log(f"Sent screenshot to agent (Response ID: {response.id})")
+            except Exception as e:
+                add_log(f"Error sending screenshot to agent: {str(e)}")
+                break
             
         add_log("Agent loop stopped")
+        
+        # Update session status
+        if st.session_state.current_session_id:
+            st.session_state.session_manager.update_session(
+                st.session_state.current_session_id,
+                {"status": "completed"}
+            )
     except Exception as e:
         add_log(f"Error in agent loop: {str(e)}")
+        # Update session status on error
+        if st.session_state.current_session_id:
+            st.session_state.session_manager.update_session(
+                st.session_state.current_session_id,
+                {"status": "error", "error": str(e)}
+            )
     finally:
         st.session_state.agent_running = False
 
