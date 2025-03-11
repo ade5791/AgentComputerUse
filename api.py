@@ -10,10 +10,11 @@ from typing import Optional, Dict, List, Any
 import uvicorn
 
 from browser_automation import BrowserAutomation
+from mock_browser_automation import MockBrowserAutomation
 from computer_use_agent import ComputerUseAgent
 from utils import get_screenshot_as_base64
 from session_manager import SessionManager
-from setup_app import check_install_dependencies
+from setup_app import check_install_dependencies, get_browser_environment
 
 # Check and install dependencies when API starts
 check_install_dependencies()
@@ -363,14 +364,28 @@ async def create_task(task_request: TaskRequest, background_tasks: BackgroundTas
     
     add_log(session_id, f"Created new session: {session_id} with task ID: {task_id}")
     
-    # Initialize browser
+    # Initialize browser based on environment
     try:
-        browser = BrowserAutomation(
-            headless=task_request.headless,
-            width=task_request.display_width,
-            height=task_request.display_height,
-            starting_url=task_request.starting_url
-        )
+        # Check which browser automation to use
+        browser_env = get_browser_environment()
+        
+        if browser_env == "mock":
+            add_log(session_id, "Using mock browser automation (Playwright not available in this environment)")
+            browser = MockBrowserAutomation(
+                headless=task_request.headless,
+                width=task_request.display_width,
+                height=task_request.display_height,
+                starting_url=task_request.starting_url
+            )
+        else:
+            add_log(session_id, "Using real browser automation with Playwright")
+            browser = BrowserAutomation(
+                headless=task_request.headless,
+                width=task_request.display_width,
+                height=task_request.display_height,
+                starting_url=task_request.starting_url
+            )
+            
         add_log(session_id, f"Browser started and navigated to {task_request.starting_url}")
     except Exception as e:
         error_message = f"Failed to start browser: {str(e)}"
@@ -379,7 +394,28 @@ async def create_task(task_request: TaskRequest, background_tasks: BackgroundTas
             session_id,
             {"status": "error", "error": error_message}
         )
-        raise HTTPException(status_code=500, detail=error_message)
+        # Try with mock browser as fallback
+        try:
+            add_log(session_id, "Trying with mock browser as fallback...")
+            browser = MockBrowserAutomation(
+                headless=task_request.headless,
+                width=task_request.display_width,
+                height=task_request.display_height,
+                starting_url=task_request.starting_url
+            )
+            add_log(session_id, f"Mock browser started successfully as fallback")
+            session_manager.update_session(
+                session_id,
+                {"status": "starting", "is_mock": True}
+            )
+        except Exception as e2:
+            error_message = f"Failed to start browser even with fallback: {str(e)} -> {str(e2)}"
+            add_log(session_id, error_message)
+            session_manager.update_session(
+                session_id,
+                {"status": "error", "error": error_message}
+            )
+            raise HTTPException(status_code=500, detail=error_message)
     
     # Initialize the Computer Use Agent
     agent = ComputerUseAgent(
