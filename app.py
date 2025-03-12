@@ -426,10 +426,10 @@ def start_agent():
             st.session_state['agent_running'] = False
     
     # Start the agent loop in a separate thread
-    st.session_state.agent_running = True
-    st.session_state.agent_thread = threading.Thread(target=enhanced_agent_wrapper)
-    st.session_state.agent_thread.daemon = True
-    st.session_state.agent_thread.start()
+    st.session_state['agent_running'] = True
+    st.session_state['agent_thread'] = threading.Thread(target=enhanced_agent_wrapper)
+    st.session_state['agent_thread'].daemon = True
+    st.session_state['agent_thread'].start()
 
 def stop_agent():
     """Stop the Computer Use Agent"""
@@ -501,13 +501,13 @@ def confirm_safety_checks():
         add_log("Safety checks acknowledged by user. Continuing task execution.")
         
         # Reset safety check state
-        st.session_state.awaiting_safety_confirmation = False
+        st.session_state['awaiting_safety_confirmation'] = False
         
         # Continue agent execution
-        st.session_state.agent_running = True
-        st.session_state.agent_thread = threading.Thread(target=enhanced_continuation_wrapper)
-        st.session_state.agent_thread.daemon = True
-        st.session_state.agent_thread.start()
+        st.session_state['agent_running'] = True
+        st.session_state['agent_thread'] = threading.Thread(target=enhanced_continuation_wrapper)
+        st.session_state['agent_thread'].daemon = True
+        st.session_state['agent_thread'].start()
     except Exception as e:
         add_log(f"Error acknowledging safety checks: {str(e)}")
         st.error(f"Error acknowledging safety checks: {str(e)}")
@@ -517,10 +517,10 @@ def reject_safety_checks():
     add_log("Safety checks rejected by user. Stopping task execution.")
     
     # Reset safety check state
-    st.session_state.awaiting_safety_confirmation = False
-    st.session_state.pending_safety_checks = None
-    st.session_state.pending_safety_response_id = None
-    st.session_state.pending_safety_call_id = None
+    st.session_state['awaiting_safety_confirmation'] = False
+    st.session_state['pending_safety_checks'] = None
+    st.session_state['pending_safety_response_id'] = None
+    st.session_state['pending_safety_call_id'] = None
     
     # Update session status
     if st.session_state.current_session_id:
