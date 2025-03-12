@@ -372,13 +372,14 @@ def load_session_replay(session_id, session_manager):
     # Button to return to main app
     st.button("← Back to Main Application", on_click=lambda: st.query_params.clear())
 
-def add_replay_button_to_session(session_id, container=None):
+def add_replay_button_to_session(session_id, container=None, button_suffix=""):
     """
     Add a replay button to a session in the UI.
     
     Args:
         session_id (str): The ID of the session
         container (st.container, optional): Container to place the button in
+        button_suffix (str, optional): Add a suffix to the button key to make it unique
     
     Returns:
         bool: True if button is pressed, False otherwise
@@ -390,8 +391,11 @@ def add_replay_button_to_session(session_id, container=None):
         # Set query parameters to show replay view
         st.query_params["replay_session"] = session_id
     
+    # Create a unique key for each button using the suffix
+    button_key = f"replay_{session_id}_{button_suffix}" if button_suffix else f"replay_{session_id}"
+    
     # Create the button
-    if container.button("🎬 Replay", key=f"replay_{session_id}", help="Replay this session"):
+    if container.button("🎬 Replay", key=button_key, help="Replay this session"):
         start_replay()
         return True
     

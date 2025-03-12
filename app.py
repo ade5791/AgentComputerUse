@@ -787,7 +787,7 @@ if st.session_state.current_session_id:
         
         # Add the replay button
         st.markdown("#### Session Actions")
-        session_replay.add_replay_button_to_session(st.session_state.current_session_id, st)
+        session_replay.add_replay_button_to_session(st.session_state.current_session_id, st, "main_view")
         
         # Add quick metrics about the session
         session_data = st.session_state.session_manager.get_session(st.session_state.current_session_id)
@@ -836,6 +836,7 @@ if sessions:
             session_replay.add_replay_button_to_session(
                 session['id'],
                 st,
+                f"list_view_{sessions.index(session)}"
             )
             
         st.divider()

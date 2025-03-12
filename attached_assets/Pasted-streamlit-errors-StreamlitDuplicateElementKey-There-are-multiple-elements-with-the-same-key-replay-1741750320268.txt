@@ -1,0 +1,26 @@
+streamlit.errors.StreamlitDuplicateElementKey: There are multiple elements with the same key='replay_4bb5b3d4-9cdc-418d-813a-dac40f0aa330'. To fix this, please make sure that the key argument is unique for each element you create.
+Traceback:
+
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 593, in code_to_exec
+    exec(code, module.__dict__)
+File "/home/runner/workspace/app.py", line 836, in <module>
+    session_replay.add_replay_button_to_session(
+File "/home/runner/workspace/session_replay.py", line 394, in add_replay_button_to_session
+    if container.button("🎬 Replay", key=f"replay_{session_id}", help="Replay this session"):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/metrics_util.py", line 410, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/elements/widgets/button.py", line 243, in button
+    return self.dg._button(
+           ^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/elements/widgets/button.py", line 1010, in _button
+    element_id = compute_and_register_element_id(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/elements/lib/utils.py", line 241, in compute_and_register_element_id
+    _register_element_id(ctx, element_type, element_id)
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/elements/lib/utils.py", line 142, in _register_element_id
+    raise StreamlitDuplicateElementKey(user_key)
