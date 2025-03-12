@@ -391,10 +391,15 @@ def add_replay_button_to_session(session_id, container=None, button_suffix=""):
         # Set query parameters to show replay view
         st.query_params["replay_session"] = session_id
     
-    # Create a unique key for each button using the suffix
-    button_key = f"replay_{session_id}_{button_suffix}" if button_suffix else f"replay_{session_id}"
+    # Generate a truly unique key by combining multiple identifiers
+    # This ensures buttons in different views don't conflict
+    unique_id = f"{session_id[:6]}_{button_suffix}"
+    timestamp = int(time.time() * 1000) % 10000  # Use time as additional uniqueness factor
     
-    # Create the button
+    # Create a unique key for each button using the suffix and location
+    button_key = f"replay_btn_{unique_id}_{timestamp}"
+    
+    # Create the button with the unique key
     if container.button("🎬 Replay", key=button_key, help="Replay this session"):
         start_replay()
         return True
