@@ -18,6 +18,7 @@ from computer_use_agent import ComputerUseAgent
 from utils import get_screenshot_as_base64
 from session_manager import SessionManager
 from setup_app import check_install_dependencies, get_browser_environment
+import session_replay
 
 # Check and install dependencies when app starts
 check_install_dependencies()
@@ -83,8 +84,7 @@ if 'show_api_docs' in query_params and query_params['show_api_docs'] == 'true':
     
 # Check if we should show the session replay
 if 'replay_session' in query_params:
-    # Import session replay functionality
-    import session_replay
+    # Load session replay view
     session_replay.load_session_replay(query_params['replay_session'], st.session_state.session_manager)
     # Stop further execution of the main app since we're showing the session replay
     st.stop()
@@ -807,9 +807,6 @@ if st.session_state.current_session_id:
         )
     
     with col2:
-        # Import session replay
-        import session_replay
-        
         # Add the replay button
         st.markdown("#### Session Actions")
         session_replay.add_replay_button_to_session(st.session_state.current_session_id, st, "main_view")
@@ -825,11 +822,7 @@ if st.session_state.current_session_id:
 # Display previous sessions
 st.header("Previous Sessions")
 sessions = st.session_state.session_manager.list_sessions(limit=5)
-if sessions:
-    # Import session replay if not already imported
-    if 'session_replay' not in locals():
-        import session_replay
-        
+if sessions:    
     for session in sessions:
         col1, col2, col3 = st.columns([3, 1, 1])
         with col1:
