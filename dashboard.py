@@ -59,7 +59,7 @@ def load_dashboard():
     col1, col2 = st.columns([1, 3])
     with col1:
         # Add animated replay button using session_replay
-        session_replay.add_replay_button_to_session(selected_session_id)
+        session_replay.add_replay_button_to_session(selected_session_id, button_suffix="overview_tab")
     
     with col2:
         st.write("Click 'Replay' to watch a detailed, animated playback of this session with all actions and reasoning.")
@@ -158,7 +158,7 @@ def load_dashboard():
         if screenshots:
             # Add replay button at the top of screenshot view
             st.info("For a detailed playback with animation and reasoning data, use the 'Replay' button below:")
-            session_replay.add_replay_button_to_session(selected_session_id)
+            session_replay.add_replay_button_to_session(selected_session_id, button_suffix="screenshots_tab")
             
             # Show slider to select screenshots by timestamp
             if len(screenshots) > 1:
@@ -248,7 +248,7 @@ def load_dashboard():
         if reasoning_data:
             # Add replay button for better reasoning visualization
             st.info("For animated playback with synchronized reasoning visualization, use the 'Replay' button:")
-            session_replay.add_replay_button_to_session(selected_session_id)
+            session_replay.add_replay_button_to_session(selected_session_id, button_suffix="reasoning_tab")
             
             # Show number of reasoning entries and metrics
             metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
