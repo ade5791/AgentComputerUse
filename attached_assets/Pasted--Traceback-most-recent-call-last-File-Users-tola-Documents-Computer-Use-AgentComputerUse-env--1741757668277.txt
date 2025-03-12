@@ -1,0 +1,79 @@
+
+Traceback (most recent call last):
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state.py", line 454, in __getitem__
+    return self._getitem(widget_id, key)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state.py", line 499, in _getitem
+    raise KeyError
+KeyError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state_proxy.py", line 130, in __getattr__
+    return self[key]
+           ~~~~^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state_proxy.py", line 101, in __getitem__
+    return get_session_state()[key]
+           ~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/safe_session_state.py", line 96, in __getitem__
+    return self._state[key]
+           ~~~~~~~~~~~^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state.py", line 456, in __getitem__
+    raise KeyError(_missing_key_error_message(key))
+KeyError: 'st.session_state has no key "session_manager". Did you forget to initialize it? More info: https://docs.streamlit.io/develop/concepts/architecture/session-state#initialization'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/app.py", line 389, in enhanced_agent_wrapper
+    session_manager=st.session_state.session_manager,
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state_proxy.py", line 132, in __getattr__
+    raise AttributeError(_missing_attr_error_message(key))
+AttributeError: st.session_state has no attribute "session_manager". Did you forget to initialize it? More info: https://docs.streamlit.io/develop/concepts/architecture/session-state#initialization
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state.py", line 454, in __getitem__
+    return self._getitem(widget_id, key)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state.py", line 499, in _getitem
+    raise KeyError
+KeyError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state_proxy.py", line 130, in __getattr__
+    return self[key]
+           ~~~~^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state_proxy.py", line 101, in __getitem__
+    return get_session_state()[key]
+           ~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/safe_session_state.py", line 96, in __getitem__
+    return self._state[key]
+           ~~~~~~~~~~~^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state.py", line 456, in __getitem__
+    raise KeyError(_missing_key_error_message(key))
+KeyError: 'st.session_state has no key "logs". Did you forget to initialize it? More info: https://docs.streamlit.io/develop/concepts/architecture/session-state#initialization'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/Cellar/python@3.13/3.13.2/Frameworks/Python.framework/Versions/3.13/lib/python3.13/threading.py", line 1041, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "/usr/local/Cellar/python@3.13/3.13.2/Frameworks/Python.framework/Versions/3.13/lib/python3.13/threading.py", line 992, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/app.py", line 407, in enhanced_agent_wrapper
+    add_log(f"Error in enhanced agent wrapper: {str(e)}")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/app.py", line 123, in add_log
+    st.session_state.logs.append(log_msg)
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tola/Documents/Computer Use/AgentComputerUse/env/lib/python3.13/site-packages/streamlit/runtime/state/session_state_proxy.py", line 132, in __getattr__
+    raise AttributeError(_missing_attr_error_message(key))
+AttributeError: st.session_state has no attribute "logs". Did you forget to initialize it? More info: https://docs.streamlit.io/develop/concepts/architecture/session-state#initialization

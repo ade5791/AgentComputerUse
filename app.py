@@ -31,35 +31,36 @@ st.set_page_config(
 )
 
 # Initialize session state variables if they don't exist
+# Use dict-like syntax for more reliable initialization across Python versions
 if 'agent_running' not in st.session_state:
-    st.session_state.agent_running = False
+    st.session_state['agent_running'] = False
 if 'agent' not in st.session_state:
-    st.session_state.agent = None
+    st.session_state['agent'] = None
 if 'browser' not in st.session_state:
-    st.session_state.browser = None
+    st.session_state['browser'] = None
 if 'logs' not in st.session_state:
-    st.session_state.logs = []
+    st.session_state['logs'] = []
 if 'screenshot' not in st.session_state:
-    st.session_state.screenshot = None
+    st.session_state['screenshot'] = None
 if 'stop_agent' not in st.session_state:
-    st.session_state.stop_agent = False
+    st.session_state['stop_agent'] = False
 if 'agent_thread' not in st.session_state:
-    st.session_state.agent_thread = None
+    st.session_state['agent_thread'] = None
 if 'session_manager' not in st.session_state:
-    st.session_state.session_manager = SessionManager()
+    st.session_state['session_manager'] = SessionManager()
 if 'current_session_id' not in st.session_state:
-    st.session_state.current_session_id = None
+    st.session_state['current_session_id'] = None
 if 'current_task_id' not in st.session_state:
-    st.session_state.current_task_id = None
+    st.session_state['current_task_id'] = None
 # Safety check related state variables
 if 'pending_safety_checks' not in st.session_state:
-    st.session_state.pending_safety_checks = None
+    st.session_state['pending_safety_checks'] = None
 if 'pending_safety_response_id' not in st.session_state:
-    st.session_state.pending_safety_response_id = None
+    st.session_state['pending_safety_response_id'] = None
 if 'pending_safety_call_id' not in st.session_state:
-    st.session_state.pending_safety_call_id = None
+    st.session_state['pending_safety_call_id'] = None
 if 'awaiting_safety_confirmation' not in st.session_state:
-    st.session_state.awaiting_safety_confirmation = False
+    st.session_state['awaiting_safety_confirmation'] = False
 
 # Check for query parameters
 query_params = st.query_params
@@ -120,12 +121,18 @@ def add_log(message):
     """Add a message to the logs and update session data if available"""
     timestamp = time.strftime("%H:%M:%S")
     log_msg = f"[{timestamp}] {message}"
-    st.session_state.logs.append(log_msg)
+    
+    # Use dict-style access for more reliable operation across Python versions
+    if 'logs' not in st.session_state:
+        st.session_state['logs'] = []
+    st.session_state['logs'].append(log_msg)
     
     # If we have an active session, update the session logs
-    if st.session_state.current_session_id:
-        st.session_state.session_manager.add_log(
-            st.session_state.current_session_id, 
+    if 'current_session_id' in st.session_state and st.session_state['current_session_id']:
+        if 'session_manager' not in st.session_state:
+            st.session_state['session_manager'] = SessionManager()
+        st.session_state['session_manager'].add_log(
+            st.session_state['current_session_id'], 
             log_msg
         )
     
@@ -140,7 +147,8 @@ def extract_reasoning_data(response, action_type=None):
     Returns:
         bool: True if reasoning data was extracted and saved
     """
-    if not st.session_state.current_session_id:
+    # Ensure session state variables exist with dict-style access
+    if 'current_session_id' not in st.session_state or not st.session_state['current_session_id']:
         return False
         
     # Extract text content from the response
@@ -157,9 +165,13 @@ def extract_reasoning_data(response, action_type=None):
         "alternatives_considered": []
     }
     
+    # Ensure session_manager exists
+    if 'session_manager' not in st.session_state:
+        st.session_state['session_manager'] = SessionManager()
+    
     # Add the reasoning data to the session
-    result = st.session_state.session_manager.add_reasoning_data(
-        st.session_state.current_session_id,
+    result = st.session_state['session_manager'].add_reasoning_data(
+        st.session_state['current_session_id'],
         reasoning_content
     )
     
@@ -384,29 +396,34 @@ def start_agent():
     # Define the enhanced agent loop wrapper function
     def enhanced_agent_wrapper():
         try:
-            # Call the enhanced agent loop
+            # Ensure all session state variables exist with dict-style access
+            if 'session_manager' not in st.session_state:
+                st.session_state['session_manager'] = SessionManager()
+                
+            # Call the enhanced agent loop with safe session state access
             result = enhanced_agent_loop(
-                session_manager=st.session_state.session_manager,
-                session_id=st.session_state.current_session_id,
-                task_id=st.session_state.current_task_id,
-                browser=st.session_state.browser,
-                agent=st.session_state.agent,
-                task=st.session_state.task,
+                session_manager=st.session_state['session_manager'],
+                session_id=st.session_state['current_session_id'],
+                task_id=st.session_state['current_task_id'],
+                browser=st.session_state['browser'],
+                agent=st.session_state['agent'],
+                task=st.session_state['task'],
                 add_log=add_log,
-                stop_signal_getter=lambda: st.session_state.stop_agent
+                stop_signal_getter=lambda: st.session_state.get('stop_agent', False)
             )
             
             # Handle safety checks if needed
             if result and result.get("status") == "safety_check":
-                st.session_state.pending_safety_checks = result.get("safety_checks")
-                st.session_state.pending_safety_response_id = result.get("response_id")
-                st.session_state.pending_safety_call_id = result.get("call_id")
-                st.session_state.awaiting_safety_confirmation = True
+                st.session_state['pending_safety_checks'] = result.get("safety_checks")
+                st.session_state['pending_safety_response_id'] = result.get("response_id")
+                st.session_state['pending_safety_call_id'] = result.get("call_id")
+                st.session_state['awaiting_safety_confirmation'] = True
                 
         except Exception as e:
             add_log(f"Error in enhanced agent wrapper: {str(e)}")
         finally:
-            st.session_state.agent_running = False
+            # Safely set the agent_running flag to False
+            st.session_state['agent_running'] = False
     
     # Start the agent loop in a separate thread
     st.session_state.agent_running = True
@@ -432,9 +449,13 @@ def close_browser():
         
 def create_reasoning_capture():
     """Create a reasoning capture instance for the current session"""
+    # Ensure session_manager exists before accessing it
+    if 'session_manager' not in st.session_state:
+        st.session_state['session_manager'] = SessionManager()
+        
     return ReasoningCapture(
-        session_manager=st.session_state.session_manager,
-        session_id=st.session_state.current_session_id,
+        session_manager=st.session_state['session_manager'],
+        session_id=st.session_state.get('current_session_id'),
         add_log_func=add_log
     )
         
@@ -447,31 +468,35 @@ def confirm_safety_checks():
         # Define the enhanced agent continuation function
         def enhanced_continuation_wrapper():
             try:
+                # Ensure all session state variables exist with dict-style access
+                if 'session_manager' not in st.session_state:
+                    st.session_state['session_manager'] = SessionManager()
+                
                 # Continue the agent loop with the initial response after safety check
                 result = enhanced_agent_loop_with_response(
-                    session_manager=st.session_state.session_manager,
-                    session_id=st.session_state.current_session_id,
-                    task_id=st.session_state.current_task_id,
-                    browser=st.session_state.browser,
-                    agent=st.session_state.agent,
-                    initial_response=st.session_state.pending_safety_response_id,
-                    initial_call_id=st.session_state.pending_safety_call_id,
-                    safety_checks=st.session_state.pending_safety_checks,
+                    session_manager=st.session_state['session_manager'],
+                    session_id=st.session_state['current_session_id'],
+                    task_id=st.session_state['current_task_id'],
+                    browser=st.session_state['browser'],
+                    agent=st.session_state['agent'],
+                    initial_response=st.session_state['pending_safety_response_id'],
+                    initial_call_id=st.session_state['pending_safety_call_id'],
+                    safety_checks=st.session_state['pending_safety_checks'],
                     add_log=add_log,
-                    stop_signal_getter=lambda: st.session_state.stop_agent
+                    stop_signal_getter=lambda: st.session_state.get('stop_agent', False)
                 )
                 
                 # Handle safety checks if needed
                 if result and result.get("status") == "safety_check":
-                    st.session_state.pending_safety_checks = result.get("safety_checks")
-                    st.session_state.pending_safety_response_id = result.get("response_id")
-                    st.session_state.pending_safety_call_id = result.get("call_id")
-                    st.session_state.awaiting_safety_confirmation = True
+                    st.session_state['pending_safety_checks'] = result.get("safety_checks")
+                    st.session_state['pending_safety_response_id'] = result.get("response_id")
+                    st.session_state['pending_safety_call_id'] = result.get("call_id")
+                    st.session_state['awaiting_safety_confirmation'] = True
                     
             except Exception as e:
                 add_log(f"Error in enhanced continuation wrapper: {str(e)}")
             finally:
-                st.session_state.agent_running = False
+                st.session_state['agent_running'] = False
         
         add_log("Safety checks acknowledged by user. Continuing task execution.")
         
